@@ -4,7 +4,7 @@ import streamlit as st
 from utils import init_history
 from config import TAB_LABELS
 from modes.chat_mode import run_chat_mode
-from modes.generate_mode import run_generate_mode
+#from modes.generate_mode import run_generate_mode
 from modes.filter_mode import run_filter_mode
 
 # --- Page config ---
@@ -26,7 +26,9 @@ for lbl in TAB_LABELS:
 # --- Sidebar: select mode ---
 mode = st.sidebar.radio(
     "Select a mode",
-    ("💬 Chat", "⚙️ Generate", "🔍 Filter & Generate"),
+    ("💬 Chat", 
+    #"⚙️ Generate", 
+    "🔍 Filter & Generate"),
     index=0,
 )
 
@@ -37,8 +39,8 @@ st.sidebar.write("Built by Waqas")
 if mode == "💬 Chat":
     run_chat_mode()
 
-elif mode == "⚙️ Generate":
-    run_generate_mode()
+# elif mode == "⚙️ Generate":
+#     run_generate_mode()
 
 elif mode == "🔍 Filter & Generate":
     run_filter_mode()
