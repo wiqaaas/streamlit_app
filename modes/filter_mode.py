@@ -1,9 +1,11 @@
 # modes/filter_mode.py
+
 import os
 import streamlit as st
 import pandas as pd
+
 from config import TAB_LABELS
-from utils import generate_dummy_response
+from ai_client import generate_ad_copy
 from modes.generate_mode import (
     DEFAULT_MATCH_TEXT,
     DEFAULT_LESSON_TEXT,
@@ -20,9 +22,9 @@ FILENAME_MAP = {
 }
 
 # Compute project & data directories
-BASE_DIR     = os.path.dirname(__file__)
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-DATA_DIR     = os.path.join(PROJECT_ROOT, "data")
+BASE_DIR     = os.path.dirname(__file__)                            
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))   
+DATA_DIR     = os.path.join(PROJECT_ROOT, "data")                    
 
 @st.cache_data(show_spinner=False)
 def load_all_dataframes():
@@ -43,23 +45,22 @@ def run_filter_mode():
     for label, tab in zip(TAB_LABELS, tabs):
         with tab:
             st.subheader(f"📊 {label} Data")
-
             df = dfs.get(label)
             if df is None:
                 st.error(f"No data for **{label}**.")
                 continue
 
-            # 2) Clear All Filters button
+            # 2) “Clear All Filters” button
             if st.button("Clear All Filters", key=f"clear_filters_{label}"):
                 for col in df.columns:
                     st.session_state[f"flt_{label}_{col}"] = ""
 
-            # 3) Build and render interdependent filters
+            # 3) Build interdependent exact‐match filters
             st.markdown("**Filter by exact column values (select to narrow):**")
             filters = {}
             with st.expander("Show filters", expanded=False):
                 for col in df.columns:
-                    # Apply the other filters first
+                    # Apply other filters first
                     temp = df.copy()
                     for other in df.columns:
                         if other == col:
@@ -68,13 +69,18 @@ def run_filter_mode():
                         if val_other:
                             temp = temp[temp[other].astype(str) == val_other]
 
-                    # Now get unique options for this column
-                    choices = [""] + sorted(temp[col].dropna().astype(str).unique())
+                    # Gather valid choices for this column
+                    opts = [""] + sorted(temp[col].dropna().astype(str).unique())
                     key = f"flt_{label}_{col}"
                     current = st.session_state.get(key, "")
-                    idx = choices.index(current) if current in choices else 0
+                    idx = opts.index(current) if current in opts else 0
 
-                    filters[col] = st.selectbox(label=col, options=choices, index=idx, key=key)
+                    filters[col] = st.selectbox(
+                        label=col,
+                        options=opts,
+                        index=idx,
+                        key=key
+                    )
 
             # 4) Apply all selected filters
             df_filtered = df.copy()
@@ -86,12 +92,12 @@ def run_filter_mode():
                 st.warning("No rows match your filters.")
                 continue
 
-            # 5) Display filtered table (original indices)
+            # 5) Display filtered DataFrame (original indices)
             st.dataframe(df_filtered)
 
             # 6) Pick an original row index to inspect
             idx = st.selectbox(
-                "Select the original row index to inspect:",
+                "Select original row index to inspect:",
                 options=list(df_filtered.index),
                 key=f"idx_{label}"
             )
@@ -102,31 +108,18 @@ def run_filter_mode():
             st.dataframe(selected_row_df)
             st.markdown("---")
 
-            # 8) Inject Generate‐mode UI
-            base      = label.replace(" ", "_").lower()
-            hist_key  = f"filter_gen_history_{base}"
-            inp_key   = f"filter_gen_input_{base}"
-            btn_key   = f"filter_gen_send_{base}"
-            clr_key   = f"filter_gen_clear_{base}"
+            # 8) “Generate Ad Copy” button
+            if st.button("Generate Ad Copy", key=f"gen_ad_{label}"):
+                # Extract row data as dict
+                row_info = selected_row_df.iloc[0].to_dict()
+                with st.spinner("Generating ad copy…"):
+                    ad_copy = generate_ad_copy(row_info)
 
-            if hist_key not in st.session_state:
-                st.session_state[hist_key] = []
-            if clr_key not in st.session_state:
-                st.session_state[clr_key] = False
+                st.subheader("📣 Generated Ad Copy")
+                st.write(ad_copy)
+                st.markdown("---")
 
-            if st.button("Send", key=btn_key):
-                msg = st.session_state.get(inp_key, "").strip()
-                if msg:
-                    st.session_state[hist_key].append(msg)
-                    st.session_state[clr_key] = True
-                else:
-                    st.warning("Please enter a message to send.")
-
-            if st.session_state[clr_key]:
-                st.session_state[inp_key] = ""
-                st.session_state[clr_key] = False
-
-            # 8a) Default promo copy
+            # 9) Default promo copy (optional)
             if label == "Upcoming Match":
                 st.markdown(DEFAULT_MATCH_TEXT)
             elif label == "Lesson":
@@ -135,14 +128,3 @@ def run_filter_mode():
                 st.markdown(DEFAULT_COURSE_TEXT)
             elif label == "Article":
                 st.markdown(DEFAULT_ARTICLE_TEXT)
-
-            # 8b) Show generate‐mode history
-            history = st.session_state[hist_key]
-            if history:
-                st.markdown("**Your Inputs So Far:**")
-                for entry in history:
-                    st.write(f"- {entry}")
-                st.markdown("---")
-
-            # 8c) Text input for new messages
-            st.text_input(f"Type your message for “{label}”…", key=inp_key)
