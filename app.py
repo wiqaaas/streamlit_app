@@ -9,8 +9,8 @@ from modes.filter_mode import run_filter_mode
 
 # --- Page config ---
 st.set_page_config(
-    page_title="Multipurpose Demo App",
-    page_icon="🤖",
+    # page_title="Multipurpose Demo App",
+    # page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded",
 )
