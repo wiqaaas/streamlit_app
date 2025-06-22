@@ -48,30 +48,26 @@ def run_filter_mode():
             df_filtered = df.copy()
             for col, val in filters.items():
                 if val != "":
-                    # compare as strings to allow mixed dtypes
                     df_filtered = df_filtered[df_filtered[col].astype(str) == val]
 
             if df_filtered.empty:
                 st.warning("No rows match your filters.")
-            else:
-                st.dataframe(df_filtered)
+                continue
 
-            # 4) Let user pick a row from the *filtered* view
-            max_idx = len(df_filtered) - 1
-            if max_idx >= 0:
-                idx = st.number_input(
-                    f"Enter row index to inspect (0 to {max_idx}):",
-                    min_value=0,
-                    max_value=max_idx,
-                    step=1,
-                    key=f"row_idx_{label.replace(' ', '_')}"
-                )
-                if st.button(
-                    f"Show row {idx} info",
-                    key=f"show_row_{label.replace(' ', '_')}"
-                ):
-                    row = df_filtered.iloc[idx]
-                    info = "; ".join(f"{col}: {row[col]}" for col in df_filtered.columns)
-                    st.markdown(f"**Row {idx} data:** {info}")
-            else:
-                st.info("No data left after filtering.")
+            # 4) Display the filtered DataFrame *with its original index*
+            st.dataframe(df_filtered)
+
+            # 5) Let user pick one of the actual row indices
+            idx = st.selectbox(
+                "Select the exact row index to inspect:",
+                options=list(df_filtered.index),
+                key=f"row_idx_{label.replace(' ', '_')}"
+            )
+
+            if st.button(
+                f"Show data for index {idx}",
+                key=f"show_row_{label.replace(' ', '_')}"
+            ):
+                row = df_filtered.loc[idx]
+                info = "; ".join(f"{col}: {row[col]}" for col in df_filtered.columns)
+                st.markdown(f"**Row {idx} data:** {info}")
