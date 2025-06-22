@@ -19,14 +19,14 @@ DATA_DIR     = os.path.join(PROJECT_ROOT, "data")            # your_project/data
 
 def run_filter_mode():
     st.header("🔍 Column-Filter & Inspect Mode")
-
     tabs = st.tabs(TAB_LABELS)
+
     for label, tab in zip(TAB_LABELS, tabs):
         with tab:
             st.subheader(f"📊 {label} Data")
 
             # 1) Load the Excel for this tab
-            filename = FILENAME_MAP.get(label)
+            filename = FILENAME_MAP[label]
             path = os.path.join(DATA_DIR, filename)
             try:
                 df = pd.read_excel(path)
@@ -34,40 +34,45 @@ def run_filter_mode():
                 st.error(f"Failed to load `{filename}`: {e}")
                 continue
 
-            # 2) Build exact-match filters for each column
-            st.markdown("**Filter by exact column values (leave blank to skip):**")
+            # 2) Show filters as selectboxes with possible values
+            st.markdown("**Filter by exact column values:**")
             filters = {}
             with st.expander("Show filters", expanded=False):
                 for col in df.columns:
-                    filters[col] = st.text_input(
-                        f"{col}",
+                    # build list of unique stringified values
+                    choices = ["—"] + sorted(
+                        df[col]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                    )
+                    filters[col] = st.selectbox(
+                        label=f"{col}",
+                        options=choices,
                         key=f"filter_{label.replace(' ', '_')}_{col}"
                     )
 
-            # 3) Apply filters
+            # 3) Apply all non-default filters
             df_filtered = df.copy()
             for col, val in filters.items():
-                if val != "":
+                if val != "—":
                     df_filtered = df_filtered[df_filtered[col].astype(str) == val]
 
             if df_filtered.empty:
                 st.warning("No rows match your filters.")
                 continue
 
-            # 4) Display the filtered DataFrame *with its original index*
+            # 4) Display the filtered DataFrame with original indices
             st.dataframe(df_filtered)
 
-            # 5) Let user pick one of the actual row indices
+            # 5) Allow picking an original row index to inspect
             idx = st.selectbox(
                 "Select the exact row index to inspect:",
                 options=list(df_filtered.index),
                 key=f"row_idx_{label.replace(' ', '_')}"
             )
 
-            if st.button(
-                f"Show data for index {idx}",
-                key=f"show_row_{label.replace(' ', '_')}"
-            ):
+            if st.button(f"Show data for index {idx}", key=f"show_row_{label.replace(' ', '_')}"):
                 row = df_filtered.loc[idx]
                 info = "; ".join(f"{col}: {row[col]}" for col in df_filtered.columns)
                 st.markdown(f"**Row {idx} data:** {info}")
