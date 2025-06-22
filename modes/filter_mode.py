@@ -4,22 +4,31 @@ from config import TAB_LABELS
 
 def run_filter_mode():
     st.header("🔍 Filter Mode")
-    tab_choice = st.selectbox("Select tab to search:", ["All"] + TAB_LABELS, key="filter_tab")
-    kw = st.text_input("Keyword to filter by:", key="filter_kw")
 
-    if st.button("Apply Filter", key="filter_button"):
-        results = []
-        target_tabs = TAB_LABELS if tab_choice == "All" else [tab_choice]
-        for lbl in target_tabs:
-            hist = st.session_state.get(f"history_{lbl.replace(' ', '_').lower()}", [])
-            for msg in hist:
-                if kw.lower() in msg["content"].lower():
-                    results.append((lbl, msg["role"], msg["content"]))
+    tabs = st.tabs(TAB_LABELS)
+    for label, tab in zip(TAB_LABELS, tabs):
+        with tab:
+            hist_key = f"history_{label.replace(' ', '_').lower()}"
+            history = st.session_state.get(hist_key, [])
 
-        if results:
-            for lbl, role, content in results:
-                st.markdown(f"**{lbl}** — *{role}*")
-                st.write(content)
-                st.markdown("---")
-        else:
-            st.info("No matching messages found.")
+            kw = st.text_input(
+                f"Keyword to filter in **{label}**:", 
+                key=f"filter_kw_{hist_key}"
+            )
+
+            if not kw:
+                st.info("Enter a keyword above to filter messages.")
+                continue
+
+            # find and display matches
+            matches = [
+                msg for msg in history
+                if kw.lower() in msg["content"].lower()
+            ]
+
+            if matches:
+                for msg in matches:
+                    with st.chat_message(msg["role"]):
+                        st.write(msg["content"])
+            else:
+                st.info(f"No messages in **{label}** matching “{kw}”.")
