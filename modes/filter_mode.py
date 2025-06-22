@@ -13,7 +13,7 @@ from modes.generate_mode import (
     DEFAULT_ARTICLE_TEXT,
 )
 
-# Map each tab to its Excel filename
+# Map tab → Excel filename
 FILENAME_MAP = {
     "Upcoming Match": "df_schedule.xlsx",
     "Lesson":         "df_lessons.xlsx",
@@ -21,14 +21,13 @@ FILENAME_MAP = {
     "Article":        "df_article_schedule.xlsx",
 }
 
-# Compute project & data directories
-BASE_DIR     = os.path.dirname(__file__)                            
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))   
-DATA_DIR     = os.path.join(PROJECT_ROOT, "data")                    
+# Paths
+BASE_DIR     = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
+DATA_DIR     = os.path.join(PROJECT_ROOT, "data")
 
 @st.cache_data(show_spinner=False)
 def load_all_dataframes():
-    """Load each Excel once per session."""
     dfs = {}
     for label, fname in FILENAME_MAP.items():
         path = os.path.join(DATA_DIR, fname)
@@ -38,10 +37,10 @@ def load_all_dataframes():
 def run_filter_mode():
     st.header("🔍 Dynamic Filter & Generate Mode")
 
-    # 1) Load all DataFrames (cached)
+    # Load once
     dfs = load_all_dataframes()
-
     tabs = st.tabs(TAB_LABELS)
+
     for label, tab in zip(TAB_LABELS, tabs):
         with tab:
             st.subheader(f"📊 {label} Data")
@@ -50,39 +49,31 @@ def run_filter_mode():
                 st.error(f"No data for **{label}**.")
                 continue
 
-            # 2) “Clear All Filters” button
+            # Clear filters
             if st.button("Clear All Filters", key=f"clear_filters_{label}"):
                 for col in df.columns:
                     st.session_state[f"flt_{label}_{col}"] = ""
 
-            # 3) Build interdependent exact‐match filters
+            # Build interdependent filters
             st.markdown("**Filter by exact column values (select to narrow):**")
             filters = {}
             with st.expander("Show filters", expanded=False):
                 for col in df.columns:
-                    # Apply other filters first
                     temp = df.copy()
                     for other in df.columns:
                         if other == col:
                             continue
-                        val_other = st.session_state.get(f"flt_{label}_{other}", "")
-                        if val_other:
-                            temp = temp[temp[other].astype(str) == val_other]
+                        val = st.session_state.get(f"flt_{label}_{other}", "")
+                        if val:
+                            temp = temp[temp[other].astype(str) == val]
 
-                    # Gather valid choices for this column
                     opts = [""] + sorted(temp[col].dropna().astype(str).unique())
                     key = f"flt_{label}_{col}"
-                    current = st.session_state.get(key, "")
-                    idx = opts.index(current) if current in opts else 0
+                    curr = st.session_state.get(key, "")
+                    idx  = opts.index(curr) if curr in opts else 0
+                    filters[col] = st.selectbox(col, opts, index=idx, key=key)
 
-                    filters[col] = st.selectbox(
-                        label=col,
-                        options=opts,
-                        index=idx,
-                        key=key
-                    )
-
-            # 4) Apply all selected filters
+            # Apply filters
             df_filtered = df.copy()
             for col, val in filters.items():
                 if val:
@@ -92,34 +83,30 @@ def run_filter_mode():
                 st.warning("No rows match your filters.")
                 continue
 
-            # 5) Display filtered DataFrame (original indices)
+            # Show filtered table
             st.dataframe(df_filtered)
 
-            # 6) Pick an original row index to inspect
+            # Pick original index
             idx = st.selectbox(
                 "Select original row index to inspect:",
                 options=list(df_filtered.index),
                 key=f"idx_{label}"
             )
-
-            # 7) Show that single row as a DataFrame
-            selected_row_df = df_filtered.loc[[idx]]
+            selected = df_filtered.loc[[idx]]
             st.markdown(f"**Selected Row {idx}:**")
-            st.dataframe(selected_row_df)
+            st.dataframe(selected)
             st.markdown("---")
 
-            # 8) “Generate Ad Copy” button
+            # Generate ad copy using the appropriate template
             if st.button("Generate Ad Copy", key=f"gen_ad_{label}"):
-                # Extract row data as dict
-                row_info = selected_row_df.iloc[0].to_dict()
+                info = selected.iloc[0].to_dict()
                 with st.spinner("Generating ad copy…"):
-                    ad_copy = generate_ad_copy(row_info)
-
+                    ad = generate_ad_copy(info, category=label)
                 st.subheader("📣 Generated Ad Copy")
-                st.write(ad_copy)
+                st.write(ad)
                 st.markdown("---")
 
-            # 9) Default promo copy (optional)
+            # Optional default promo below
             if label == "Upcoming Match":
                 st.markdown(DEFAULT_MATCH_TEXT)
             elif label == "Lesson":
