@@ -3,7 +3,7 @@ import streamlit as st
 from config import TAB_LABELS
 from utils import generate_dummy_response
 
-# Default Upcoming Match copy
+# --- Default copy constants ---
 DEFAULT_MATCH_TEXT = """
 🇮🇪 **Rivalry reborn on Irish turf.**  
 Bunclody Polo Club hosted a fierce face-off last season as Glenpatrick and Tyrone battled under grey skies and roaring crowds. 🍀
@@ -17,7 +17,6 @@ Bunclody Polo Club hosted a fierce face-off last season as Glenpatrick and Tyron
 #IrelandPolo #GlenpatrickVsTyrone #PoloThrowback
 """
 
-# Default Lesson copy
 DEFAULT_LESSON_TEXT = """
 💥 **POWER. PRECISION. POLO.**  
 Ever wonder how top players unleash explosive power in every swing? 🎯  
@@ -33,7 +32,6 @@ Ever wonder how top players unleash explosive power in every swing? 🎯
 #PoloTraining #JamesBeim #PoloSwingTechnique
 """
 
-# Default Course copy
 DEFAULT_COURSE_TEXT = """
 🚨 **Master the art of momentum and positioning.**  
 A split-second line change can make or break a play — are you reading it right?  
@@ -49,7 +47,6 @@ A split-second line change can make or break a play — are you reading it right
 #PoloIQ #QuickLineChange #PoloTactics
 """
 
-# Default Article copy
 DEFAULT_ARTICLE_TEXT = """
 🏆 **Victory at Cirencester!**  
 Kulin Rock storms to glory in The Gerald Balding — delivering a thrilling finale at one of the UK’s most iconic clubs GB  
@@ -75,9 +72,14 @@ def run_generate_mode():
         with tab:
             key_base = label.replace(" ", "_").lower()
             inp_key  = f"gen_input_{key_base}"
-            btn_key  = f"gen_button_{key_base}"
+            hist_key = f"gen_history_{key_base}"
+            btn_key  = f"send_button_{key_base}"
 
-            # Show the default promo text for each tab
+            # --- Initialize per-tab history list ---
+            if hist_key not in st.session_state:
+                st.session_state[hist_key] = []
+
+            # --- 1) Default promo copy ---
             if label == "Upcoming Match":
                 st.markdown(DEFAULT_MATCH_TEXT)
             elif label == "Lesson":
@@ -87,15 +89,20 @@ def run_generate_mode():
             elif label == "Article":
                 st.markdown(DEFAULT_ARTICLE_TEXT)
 
-            # User input
-            prompt = st.text_input(
-                f"Enter something to generate for “{label}”:",
-                key=inp_key
-            )
+            # --- 2) Render all previously appended inputs ---
+            if st.session_state[hist_key]:
+                st.markdown("**Your Inputs:**")
+                for msg in st.session_state[hist_key]:
+                    st.write(f"- {msg}")
+                st.divider()  # subtle separator
 
-            # Generate button
-            if st.button("Generate Response", key=btn_key):
+            # --- 3) Input box + Send button ---
+            prompt = st.text_input(f"Type your message for “{label}”…", key=inp_key)
+            if st.button("Send", key=btn_key):
                 if prompt:
-                    st.write(generate_dummy_response(prompt))
+                    # append to history
+                    st.session_state[hist_key].append(prompt)
+                    # clear the input
+                    st.session_state[inp_key] = ""
                 else:
-                    st.warning("Please type a prompt above.")
+                    st.warning("Please enter a message to send.")
