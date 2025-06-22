@@ -20,9 +20,9 @@ FILENAME_MAP = {
 }
 
 # Compute project & data directories
-BASE_DIR     = os.path.dirname(__file__)                     
+BASE_DIR     = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-DATA_DIR     = os.path.join(PROJECT_ROOT, "data")            
+DATA_DIR     = os.path.join(PROJECT_ROOT, "data")
 
 @st.cache_data(show_spinner=False)
 def load_all_dataframes():
@@ -49,43 +49,34 @@ def run_filter_mode():
                 st.error(f"No data for **{label}**.")
                 continue
 
-            # 2) Clear All Filters button
+            # 2) Clear All Filters button (no explicit rerun needed)
             if st.button("Clear All Filters", key=f"clear_filters_{label}"):
                 for col in df.columns:
                     st.session_state[f"flt_{label}_{col}"] = ""
-                st.experimental_rerun()
 
             # 3) Build and render interdependent filters
             st.markdown("**Filter by exact column values (select to narrow):**")
             filters = {}
             with st.expander("Show filters", expanded=False):
                 for col in df.columns:
-                    # Apply all other filters first to compute valid choices
+                    # Apply the other filters first
                     temp = df.copy()
                     for other in df.columns:
                         if other == col:
                             continue
-                        key_other = f"flt_{label}_{other}"
-                        val_other = st.session_state.get(key_other, "")
+                        val_other = st.session_state.get(f"flt_{label}_{other}", "")
                         if val_other:
                             temp = temp[temp[other].astype(str) == val_other]
 
-                    # Gather unique options for this column
-                    unique_vals = sorted(temp[col].dropna().astype(str).unique())
-                    choices = [""] + unique_vals
-
+                    # Now get unique options for this column
+                    choices = [""] + sorted(temp[col].dropna().astype(str).unique())
                     key = f"flt_{label}_{col}"
                     current = st.session_state.get(key, "")
-                    index = choices.index(current) if current in choices else 0
+                    idx = choices.index(current) if current in choices else 0
 
-                    filters[col] = st.selectbox(
-                        label=col,
-                        options=choices,
-                        index=index,
-                        key=key
-                    )
+                    filters[col] = st.selectbox(label=col, options=choices, index=idx, key=key)
 
-            # 4) Apply all selected filters to df
+            # 4) Apply all selected filters
             df_filtered = df.copy()
             for col, val in filters.items():
                 if val:
@@ -95,34 +86,32 @@ def run_filter_mode():
                 st.warning("No rows match your filters.")
                 continue
 
-            # 5) Display filtered table with original indices
+            # 5) Display filtered table (original indices)
             st.dataframe(df_filtered)
 
-            # 6) Let user pick an actual row index to inspect
+            # 6) Pick an original row index to inspect
             idx = st.selectbox(
                 "Select the original row index to inspect:",
                 options=list(df_filtered.index),
                 key=f"idx_{label}"
             )
             row = df_filtered.loc[idx]
-            row_info = "; ".join(f"{col}: {row[col]}" for col in df_filtered.columns)
-            st.markdown(f"**Selected Row {idx}:** {row_info}")
+            info = "; ".join(f"{c}: {row[c]}" for c in df_filtered.columns)
+            st.markdown(f"**Selected Row {idx}:** {info}")
             st.markdown("---")
 
-            # 7) Inject Generate-mode UI for this tab
+            # 7) Inject Generate‐mode UI
             base      = label.replace(" ", "_").lower()
             hist_key  = f"filter_gen_history_{base}"
             inp_key   = f"filter_gen_input_{base}"
             btn_key   = f"filter_gen_send_{base}"
             clr_key   = f"filter_gen_clear_{base}"
 
-            # Initialize session state
             if hist_key not in st.session_state:
                 st.session_state[hist_key] = []
             if clr_key not in st.session_state:
                 st.session_state[clr_key] = False
 
-            # Handle Send button
             if st.button("Send", key=btn_key):
                 msg = st.session_state.get(inp_key, "").strip()
                 if msg:
@@ -131,7 +120,6 @@ def run_filter_mode():
                 else:
                     st.warning("Please enter a message to send.")
 
-            # Clear the input if flagged
             if st.session_state[clr_key]:
                 st.session_state[inp_key] = ""
                 st.session_state[clr_key] = False
@@ -146,7 +134,7 @@ def run_filter_mode():
             elif label == "Article":
                 st.markdown(DEFAULT_ARTICLE_TEXT)
 
-            # 7b) Show any previous user inputs
+            # 7b) Show generate‐mode history
             history = st.session_state[hist_key]
             if history:
                 st.markdown("**Your Inputs So Far:**")
@@ -154,5 +142,5 @@ def run_filter_mode():
                     st.write(f"- {entry}")
                 st.markdown("---")
 
-            # 7c) Finally, the text_input widget
+            # 7c) Text input for new messages
             st.text_input(f"Type your message for “{label}”…", key=inp_key)
