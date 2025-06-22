@@ -70,14 +70,31 @@ def run_generate_mode():
     tabs = st.tabs(TAB_LABELS)
     for label, tab in zip(TAB_LABELS, tabs):
         with tab:
-            key_base = label.replace(" ", "_").lower()
-            inp_key  = f"gen_input_{key_base}"
-            hist_key = f"gen_history_{key_base}"
-            btn_key  = f"send_button_{key_base}"
+            base = label.replace(" ", "_").lower()
+            hist_key  = f"gen_history_{base}"
+            inp_key   = f"gen_input_{base}"
+            btn_key   = f"gen_send_{base}"
+            clear_key = f"gen_clear_{base}"
 
-            # --- Initialize per-tab history list ---
+            # --- Initialize session state ---
             if hist_key not in st.session_state:
                 st.session_state[hist_key] = []
+            if clear_key not in st.session_state:
+                st.session_state[clear_key] = False
+
+            # --- Handle Send button *before* the text_input widget ---
+            if st.button("Send", key=btn_key):
+                msg = st.session_state.get(inp_key, "").strip()
+                if msg:
+                    st.session_state[hist_key].append(msg)
+                    st.session_state[clear_key] = True
+                else:
+                    st.warning("Please enter a message to send.")
+
+            # --- If flagged, clear the input *before* the widget is created ---
+            if st.session_state[clear_key]:
+                st.session_state[inp_key] = ""
+                st.session_state[clear_key] = False
 
             # --- 1) Default promo copy ---
             if label == "Upcoming Match":
@@ -89,20 +106,13 @@ def run_generate_mode():
             elif label == "Article":
                 st.markdown(DEFAULT_ARTICLE_TEXT)
 
-            # --- 2) Render all previously appended inputs ---
-            if st.session_state[hist_key]:
-                st.markdown("**Your Inputs:**")
-                for msg in st.session_state[hist_key]:
-                    st.write(f"- {msg}")
-                st.divider()  # subtle separator
+            # --- 2) Render appended inputs below that ---
+            history = st.session_state[hist_key]
+            if history:
+                st.markdown("**Your Inputs So Far:**")
+                for entry in history:
+                    st.write(f"- {entry}")
+                st.markdown("---")
 
-            # --- 3) Input box + Send button ---
-            prompt = st.text_input(f"Type your message for “{label}”…", key=inp_key)
-            if st.button("Send", key=btn_key):
-                if prompt:
-                    # append to history
-                    st.session_state[hist_key].append(prompt)
-                    # clear the input
-                    st.session_state[inp_key] = ""
-                else:
-                    st.warning("Please enter a message to send.")
+            # --- 3) Finally, the text_input widget itself ---
+            st.text_input(f"Type your message for “{label}”…", key=inp_key)
