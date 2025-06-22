@@ -19,7 +19,7 @@ FILENAME_MAP = {
     "Article":        "df_article_schedule.xlsx",
 }
 
-# Compute paths
+# Compute project & data directories
 BASE_DIR     = os.path.dirname(__file__)                     
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 DATA_DIR     = os.path.join(PROJECT_ROOT, "data")            
@@ -49,12 +49,18 @@ def run_filter_mode():
                 st.error(f"No data for **{label}**.")
                 continue
 
-            # 2) Build and render interdependent filters
+            # 2) Clear All Filters button
+            if st.button("Clear All Filters", key=f"clear_filters_{label}"):
+                for col in df.columns:
+                    st.session_state[f"flt_{label}_{col}"] = ""
+                st.experimental_rerun()
+
+            # 3) Build and render interdependent filters
             st.markdown("**Filter by exact column values (select to narrow):**")
             filters = {}
             with st.expander("Show filters", expanded=False):
                 for col in df.columns:
-                    # Apply all *other* filters first to compute choices
+                    # Apply all other filters first to compute valid choices
                     temp = df.copy()
                     for other in df.columns:
                         if other == col:
@@ -64,23 +70,22 @@ def run_filter_mode():
                         if val_other:
                             temp = temp[temp[other].astype(str) == val_other]
 
-                    # Now get unique options for this column
+                    # Gather unique options for this column
                     unique_vals = sorted(temp[col].dropna().astype(str).unique())
                     choices = [""] + unique_vals
 
                     key = f"flt_{label}_{col}"
-                    # keep current selection if still valid
                     current = st.session_state.get(key, "")
-                    idx = choices.index(current) if current in choices else 0
+                    index = choices.index(current) if current in choices else 0
 
                     filters[col] = st.selectbox(
                         label=col,
                         options=choices,
-                        index=idx,
+                        index=index,
                         key=key
                     )
 
-            # 3) Apply **all** selected filters to df
+            # 4) Apply all selected filters to df
             df_filtered = df.copy()
             for col, val in filters.items():
                 if val:
@@ -90,10 +95,10 @@ def run_filter_mode():
                 st.warning("No rows match your filters.")
                 continue
 
-            # 4) Display filtered table with original indices
+            # 5) Display filtered table with original indices
             st.dataframe(df_filtered)
 
-            # 5) Let user pick an actual row index to inspect
+            # 6) Let user pick an actual row index to inspect
             idx = st.selectbox(
                 "Select the original row index to inspect:",
                 options=list(df_filtered.index),
@@ -104,20 +109,20 @@ def run_filter_mode():
             st.markdown(f"**Selected Row {idx}:** {row_info}")
             st.markdown("---")
 
-            # 6) Inject Generate-mode UI for this tab
+            # 7) Inject Generate-mode UI for this tab
             base      = label.replace(" ", "_").lower()
             hist_key  = f"filter_gen_history_{base}"
             inp_key   = f"filter_gen_input_{base}"
             btn_key   = f"filter_gen_send_{base}"
             clr_key   = f"filter_gen_clear_{base}"
 
-            # Initialize session state for this tab
+            # Initialize session state
             if hist_key not in st.session_state:
                 st.session_state[hist_key] = []
             if clr_key not in st.session_state:
                 st.session_state[clr_key] = False
 
-            # Handle Send button *before* input widget
+            # Handle Send button
             if st.button("Send", key=btn_key):
                 msg = st.session_state.get(inp_key, "").strip()
                 if msg:
@@ -131,7 +136,7 @@ def run_filter_mode():
                 st.session_state[inp_key] = ""
                 st.session_state[clr_key] = False
 
-            # 6a) Default promo copy
+            # 7a) Default promo copy
             if label == "Upcoming Match":
                 st.markdown(DEFAULT_MATCH_TEXT)
             elif label == "Lesson":
@@ -141,7 +146,7 @@ def run_filter_mode():
             elif label == "Article":
                 st.markdown(DEFAULT_ARTICLE_TEXT)
 
-            # 6b) Show any previous user inputs
+            # 7b) Show any previous user inputs
             history = st.session_state[hist_key]
             if history:
                 st.markdown("**Your Inputs So Far:**")
@@ -149,5 +154,5 @@ def run_filter_mode():
                     st.write(f"- {entry}")
                 st.markdown("---")
 
-            # 6c) Finally, the text_input widget
+            # 7c) Finally, the text_input widget
             st.text_input(f"Type your message for “{label}”…", key=inp_key)
