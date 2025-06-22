@@ -5,7 +5,7 @@ __pycache__/
 
 # Streamlit / virtualenv
 .venv/
-#.env
+.env
 
 # OS files
 .DS_Store
