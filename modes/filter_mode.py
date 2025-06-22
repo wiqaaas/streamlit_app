@@ -49,7 +49,7 @@ def run_filter_mode():
                 st.error(f"No data for **{label}**.")
                 continue
 
-            # 2) Clear All Filters button (no explicit rerun needed)
+            # 2) Clear All Filters button
             if st.button("Clear All Filters", key=f"clear_filters_{label}"):
                 for col in df.columns:
                     st.session_state[f"flt_{label}_{col}"] = ""
@@ -95,12 +95,14 @@ def run_filter_mode():
                 options=list(df_filtered.index),
                 key=f"idx_{label}"
             )
-            row = df_filtered.loc[idx]
-            info = "; ".join(f"{c}: {row[c]}" for c in df_filtered.columns)
-            st.markdown(f"**Selected Row {idx}:** {info}")
+
+            # 7) Show that single row as a DataFrame
+            selected_row_df = df_filtered.loc[[idx]]
+            st.markdown(f"**Selected Row {idx}:**")
+            st.dataframe(selected_row_df)
             st.markdown("---")
 
-            # 7) Inject Generate‐mode UI
+            # 8) Inject Generate‐mode UI
             base      = label.replace(" ", "_").lower()
             hist_key  = f"filter_gen_history_{base}"
             inp_key   = f"filter_gen_input_{base}"
@@ -124,7 +126,7 @@ def run_filter_mode():
                 st.session_state[inp_key] = ""
                 st.session_state[clr_key] = False
 
-            # 7a) Default promo copy
+            # 8a) Default promo copy
             if label == "Upcoming Match":
                 st.markdown(DEFAULT_MATCH_TEXT)
             elif label == "Lesson":
@@ -134,7 +136,7 @@ def run_filter_mode():
             elif label == "Article":
                 st.markdown(DEFAULT_ARTICLE_TEXT)
 
-            # 7b) Show generate‐mode history
+            # 8b) Show generate‐mode history
             history = st.session_state[hist_key]
             if history:
                 st.markdown("**Your Inputs So Far:**")
@@ -142,5 +144,5 @@ def run_filter_mode():
                     st.write(f"- {entry}")
                 st.markdown("---")
 
-            # 7c) Text input for new messages
+            # 8c) Text input for new messages
             st.text_input(f"Type your message for “{label}”…", key=inp_key)
