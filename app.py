@@ -1,42 +1,53 @@
 # app.py
+import os
 import streamlit as st
-from modes.chat_mode   import run_chat_mode
+from utils import init_history
+from config import TAB_LABELS
+from modes.chat_mode import run_chat_mode
 from modes.generate_mode import run_generate_mode
 from modes.filter_mode import run_filter_mode
 
-st.set_page_config(page_title="Chat / Generate / Filter Demo", layout="wide")
-st.title("Mode Selector")
+# --- Page config ---
+st.set_page_config(
+    page_title="Multipurpose Demo App",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-# initialize histories for chat tabs
-from utils import init_history
-from config import TAB_LABELS
+# --- App title & description ---
+st.title("🤖 Multipurpose Streamlit App")
+st.markdown(
+    """
+    Welcome!  
+    Use the **sidebar** to switch between modes:
+    - 💬 **Chat**  
+    - ⚙️ **Generate**  
+    - 🔍 **Filter & Generate**  
+    """
+)
+
+# --- Initialize chat histories ---
 for lbl in TAB_LABELS:
-    init_history(f"history_{lbl.replace(' ', '_').lower()}")
+    key = f"history_{lbl.replace(' ', '_').lower()}"
+    init_history(key)
 
-# Mode selection
-if "mode" not in st.session_state:
-    st.session_state.mode = None
+# --- Sidebar: select mode ---
+mode = st.sidebar.radio(
+    "Select a mode",
+    ("💬 Chat", "⚙️ Generate", "🔍 Filter & Generate"),
+    index=0,
+)
 
-c1, c2, c3 = st.columns(3)
-with c1:
-    if st.button("Chat"):
-        st.session_state.mode = "chat"
-with c2:
-    if st.button("Generate"):
-        st.session_state.mode = "generate"
-with c3:
-    if st.button("Filter"):
-        st.session_state.mode = "filter"
+st.sidebar.markdown("---")
+st.sidebar.write("Built by Waqas")
 
-st.markdown("---")
-
-# Dispatch
-mode = st.session_state.mode
-if mode == "chat":
+# --- Dispatch to the appropriate mode ---
+if mode == "💬 Chat":
     run_chat_mode()
-elif mode == "generate":
+
+elif mode == "⚙️ Generate":
     run_generate_mode()
-elif mode == "filter":
+
+elif mode == "🔍 Filter & Generate":
     run_filter_mode()
-else:
-    st.info("Select one of the modes above: **Chat**, **Generate** or **Filter**.")
