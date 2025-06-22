@@ -33,7 +33,7 @@ mode = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.write("Built by Waqas")
+st.sidebar.write("Built by MySportsAnalysis Ltd")
 
 # --- Dispatch to the appropriate mode ---
 if mode == "💬 Chat":
