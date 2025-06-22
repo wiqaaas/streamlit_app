@@ -3,6 +3,13 @@ import os
 import streamlit as st
 import pandas as pd
 from config import TAB_LABELS
+from utils import generate_dummy_response
+from modes.generate_mode import (
+    DEFAULT_MATCH_TEXT,
+    DEFAULT_LESSON_TEXT,
+    DEFAULT_COURSE_TEXT,
+    DEFAULT_ARTICLE_TEXT,
+)
 
 # Map each tab to its Excel filename
 FILENAME_MAP = {
@@ -12,14 +19,14 @@ FILENAME_MAP = {
     "Article":        "df_article_schedule.xlsx",
 }
 
-# Compute project & data directories
+# Compute paths
 BASE_DIR     = os.path.dirname(__file__)                     
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 DATA_DIR     = os.path.join(PROJECT_ROOT, "data")            
 
 @st.cache_data(show_spinner=False)
 def load_all_dataframes():
-    """Read each Excel once and cache it."""
+    """Load each Excel once per session."""
     dfs = {}
     for label, fname in FILENAME_MAP.items():
         path = os.path.join(DATA_DIR, fname)
@@ -27,9 +34,9 @@ def load_all_dataframes():
     return dfs
 
 def run_filter_mode():
-    st.header("🔍 Filter & Generate Mode")
+    st.header("🔍 Dynamic Filter & Generate Mode")
 
-    # Load all dataframes at once (cached)
+    # 1) Load all DataFrames (cached)
     dfs = load_all_dataframes()
 
     tabs = st.tabs(TAB_LABELS)
@@ -42,63 +49,75 @@ def run_filter_mode():
                 st.error(f"No data for **{label}**.")
                 continue
 
-            # 1) Exact-match filters
-            st.markdown("**Filter by exact column values (leave blank to skip):**")
+            # 2) Build and render interdependent filters
+            st.markdown("**Filter by exact column values (select to narrow):**")
             filters = {}
             with st.expander("Show filters", expanded=False):
                 for col in df.columns:
-                    choices = [""] + sorted(df[col].dropna().astype(str).unique())
+                    # Apply all *other* filters first to compute choices
+                    temp = df.copy()
+                    for other in df.columns:
+                        if other == col:
+                            continue
+                        key_other = f"flt_{label}_{other}"
+                        val_other = st.session_state.get(key_other, "")
+                        if val_other:
+                            temp = temp[temp[other].astype(str) == val_other]
+
+                    # Now get unique options for this column
+                    unique_vals = sorted(temp[col].dropna().astype(str).unique())
+                    choices = [""] + unique_vals
+
+                    key = f"flt_{label}_{col}"
+                    # keep current selection if still valid
+                    current = st.session_state.get(key, "")
+                    idx = choices.index(current) if current in choices else 0
+
                     filters[col] = st.selectbox(
                         label=col,
                         options=choices,
-                        key=f"flt_{label}_{col}"
+                        index=idx,
+                        key=key
                     )
 
-            df_filt = df.copy()
+            # 3) Apply **all** selected filters to df
+            df_filtered = df.copy()
             for col, val in filters.items():
                 if val:
-                    df_filt = df_filt[df_filt[col].astype(str) == val]
+                    df_filtered = df_filtered[df_filtered[col].astype(str) == val]
 
-            if df_filt.empty:
+            if df_filtered.empty:
                 st.warning("No rows match your filters.")
                 continue
 
-            # 2) Display filtered table (original indices kept)
-            st.dataframe(df_filt)
+            # 4) Display filtered table with original indices
+            st.dataframe(df_filtered)
 
-            # 3) Row selection from actual index
+            # 5) Let user pick an actual row index to inspect
             idx = st.selectbox(
-                "Select the exact row index to inspect:",
-                options=list(df_filt.index),
+                "Select the original row index to inspect:",
+                options=list(df_filtered.index),
                 key=f"idx_{label}"
             )
-            row = df_filt.loc[idx]
-            row_info = "; ".join(f"{col}: {row[col]}" for col in df_filt.columns)
+            row = df_filtered.loc[idx]
+            row_info = "; ".join(f"{col}: {row[col]}" for col in df_filtered.columns)
             st.markdown(f"**Selected Row {idx}:** {row_info}")
             st.markdown("---")
 
-            # 4) Embed your Generate-mode UI:
-            from utils import generate_dummy_response
-            from modes.generate_mode import (
-                DEFAULT_MATCH_TEXT,
-                DEFAULT_LESSON_TEXT,
-                DEFAULT_COURSE_TEXT,
-                DEFAULT_ARTICLE_TEXT,
-            )
-
+            # 6) Inject Generate-mode UI for this tab
             base      = label.replace(" ", "_").lower()
             hist_key  = f"filter_gen_history_{base}"
             inp_key   = f"filter_gen_input_{base}"
             btn_key   = f"filter_gen_send_{base}"
             clr_key   = f"filter_gen_clear_{base}"
 
-            # Init session state
+            # Initialize session state for this tab
             if hist_key not in st.session_state:
                 st.session_state[hist_key] = []
             if clr_key not in st.session_state:
                 st.session_state[clr_key] = False
 
-            # Send button
+            # Handle Send button *before* input widget
             if st.button("Send", key=btn_key):
                 msg = st.session_state.get(inp_key, "").strip()
                 if msg:
@@ -107,12 +126,12 @@ def run_filter_mode():
                 else:
                     st.warning("Please enter a message to send.")
 
-            # Clear input
+            # Clear the input if flagged
             if st.session_state[clr_key]:
                 st.session_state[inp_key] = ""
                 st.session_state[clr_key] = False
 
-            # Default promo copy
+            # 6a) Default promo copy
             if label == "Upcoming Match":
                 st.markdown(DEFAULT_MATCH_TEXT)
             elif label == "Lesson":
@@ -122,7 +141,7 @@ def run_filter_mode():
             elif label == "Article":
                 st.markdown(DEFAULT_ARTICLE_TEXT)
 
-            # Show generate-mode history
+            # 6b) Show any previous user inputs
             history = st.session_state[hist_key]
             if history:
                 st.markdown("**Your Inputs So Far:**")
@@ -130,5 +149,5 @@ def run_filter_mode():
                     st.write(f"- {entry}")
                 st.markdown("---")
 
-            # Input box
+            # 6c) Finally, the text_input widget
             st.text_input(f"Type your message for “{label}”…", key=inp_key)
