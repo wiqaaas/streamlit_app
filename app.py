@@ -17,15 +17,6 @@ st.set_page_config(
 
 # --- App title & description ---
 st.title("🤖 Multipurpose Streamlit App")
-st.markdown(
-    """
-    Welcome!  
-    Use the **sidebar** to switch between modes:
-    - 💬 **Chat**  
-    - ⚙️ **Generate**  
-    - 🔍 **Filter & Generate**  
-    """
-)
 
 # --- Initialize chat histories ---
 for lbl in TAB_LABELS:
