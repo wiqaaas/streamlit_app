@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 # --- App title & description ---
-st.title("🤖 Multipurpose Streamlit App")
+# st.title("🤖 Multipurpose Streamlit App")
 
 # --- Initialize chat histories ---
 for lbl in TAB_LABELS:
