@@ -12,8 +12,3 @@ FILENAME_MAP = {
     "Course":         "df_courses.xlsx",
     "Article":        "df_article_schedule.xlsx",
 }
-
-# Compute project & data paths
-BASE_DIR     = os.path.dirname(__file__)
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-DATA_DIR     = os.path.join(PROJECT_ROOT, "data")

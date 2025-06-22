@@ -3,7 +3,12 @@ import os
 import pandas as pd
 import streamlit as st
 from utils import init_history, generate_dummy_response
-from config import TAB_LABELS, FILENAME_MAP, DATA_DIR
+from config import TAB_LABELS, FILENAME_MAP
+
+# Compute project & data paths
+BASE_DIR     = os.path.dirname(__file__)
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
+DATA_DIR     = os.path.join(PROJECT_ROOT, "data")
 
 def run_chat_mode():
     st.header("💬 Chat Mode")
