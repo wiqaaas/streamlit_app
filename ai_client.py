@@ -1,0 +1,105 @@
+# ai_client.py
+
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# 1) Load .env
+load_dotenv()
+API_KEY = os.getenv("OPENAI_API_KEY")
+if not API_KEY:
+    raise ValueError("Missing OPENAI_API_KEY in environment")
+
+# 2) Instantiate client
+_client = OpenAI(api_key=API_KEY)
+
+PROMPT_TEMPLATES = {
+    "Upcoming Match": {
+        "system": (
+            "You are the world’s top-tier social media strategist for polo events. "
+            "Your job is to craft high-converting Instagram ads that build excitement and drive viewer engagement."
+        ),
+        "user": (
+            "Using the following match details:\n{info}\n"
+            "Create a compelling Instagram ad caption that captures the energy of the upcoming game. "
+            "Make it visually engaging, emotionally resonant, and optimized to stop the scroll. "
+            "Include a sense of urgency, key match details, and a call to watch or follow."
+        ),
+    },
+    "Lesson": {
+        "system": (
+            "You are a high-converting Instagram ad copywriter specializing in sports education. "
+            "Your goal is to drive sign-ups and spark interest in polo training content."
+        ),
+        "user": (
+            "Given the following lesson details:\n{info}\n"
+            "Write an Instagram ad caption that highlights what the lesson teaches, why it matters, and who it's for. "
+            "Use a confident tone, include benefits, and end with a clear call to action (e.g., 'Watch now', 'Master your next move')."
+        ),
+    },
+    "Course": {
+        "system": (
+            "You are a results-driven digital marketer focused on promoting online sports courses. "
+            "Your specialty is writing irresistible Instagram captions that boost enrollment."
+        ),
+        "user": (
+            "Based on this course information:\n{info}\n"
+            "Write an Instagram ad that makes the course feel essential for anyone looking to level up their polo skills. "
+            "Highlight outcomes, target audience, and create FOMO with urgency cues (e.g., 'Limited spots', 'Enroll now')."
+        ),
+    },
+    "Article": {
+        "system": (
+            "You are a social media content strategist for a leading polo media brand. "
+            "You excel at turning long-form content into short, click-worthy Instagram captions."
+        ),
+        "user": (
+            "Using the article info below:\n{info}\n"
+            "Write a teaser Instagram caption that hooks attention, hints at the value of the article, and encourages followers to click the link or visit the site to read more. "
+            "Use emotion, curiosity, or controversy if applicable."
+        ),
+    },
+}
+
+def generate_ad_copy(
+    info: dict,
+    category: str,
+    model: str = "gpt-4o",
+    temperature: float = 0.7
+) -> str:
+    """
+    Given a dict of row data and a category (one of TAB_LABELS),
+    call OpenAI to produce tailored Instagram ad copy.
+    """
+    if category not in PROMPT_TEMPLATES:
+        raise ValueError(f"Unknown category: {category}")
+
+    tpl = PROMPT_TEMPLATES[category]
+    system_prompt = tpl["system"]
+    user_prompt   = tpl["user"].format(info=info)
+
+    resp = _client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system",  "content": system_prompt},
+            {"role": "user",    "content": user_prompt},
+        ],
+        temperature=temperature,
+    )
+    return resp.choices[0].message.content
+
+def chat_conversation(
+    messages: list[dict],
+    model: str = "gpt-4o",
+    temperature: float = 0.7
+) -> str:
+    """
+    Continue a chat given a list of {'role':..., 'content':...} messages.
+    Returns the assistant’s reply.
+    """
+    resp = _client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+    )
+    return resp.choices[0].message.content
