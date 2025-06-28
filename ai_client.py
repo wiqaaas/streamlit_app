@@ -157,6 +157,8 @@ def get_best_matching_row(category: str, prompt: str, top_k: int = 1) -> pd.Data
         return pd.DataFrame()
 
 # ─── Generate “fake row text” in the exact embedding format ─────────────────
+# ai_client.py (excerpt)
+
 def generate_fake_row_text(
     prompt: str,
     example_row: dict,
@@ -164,12 +166,10 @@ def generate_fake_row_text(
     temperature: float = 0.7
 ) -> str:
     """
-    Given a user prompt and one example row (as a dict of col→value),
-    ask the LLM to output a *single string* ready for embedding, in the
-    exact format you used when you indexed:
-        "ColA: valA  ColB: valB  ...  ColZ: valZ"
+    Given a user prompt and one example row dict, ask the LLM to output a single
+    string in the exact "ColA: valA  ColB: valB" format used when indexing.
+    If the prompt does NOT mention a column, its value should be left empty.
     """
-    # 1) Build an actual example text from the row
     columns      = list(example_row.keys())
     example_text = "  ".join(f"{col}: {example_row[col]}" for col in columns)
 
@@ -178,11 +178,15 @@ def generate_fake_row_text(
         "column name with its cell value, separated by ': ' and two spaces.  "
         "Here is one real example of how a row was formatted:\n\n"
         f"{example_text}\n\n"
-        "Given the user's description, produce exactly one line in that same format."
+        "When given a description, produce exactly one line in that same format.  "
+        "If the description does NOT provide a value for a column, leave that column's "
+        "value empty (i.e. just output 'ColumnName: ' with nothing after the colon)."
     )
     user = (
         f"Description: {prompt}\n\n"
-        "Return *only* the single-line text, following exactly the pattern shown above."
+        "Return *only* the single-line text, for example:\n"
+        "  Col1: Foo  Col2:   Col3: Baz\n\n"
+        "(note that Col2 is empty because no info was provided)"
     )
 
     resp = _client.chat.completions.create(
@@ -194,7 +198,6 @@ def generate_fake_row_text(
         temperature=temperature,
     )
     return resp.choices[0].message.content.strip()
-
 
 def search_with_fake_row_ai(
     category: str,
