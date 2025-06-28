@@ -100,11 +100,11 @@ def run_chat_mode():
                     st.markdown("---")
 
                 # Optional default promo copy
-                if label == "Upcoming Match":
-                    st.markdown(DEFAULT_MATCH_TEXT)
-                elif label == "Lesson":
-                    st.markdown(DEFAULT_LESSON_TEXT)
-                elif label == "Course":
-                    st.markdown(DEFAULT_COURSE_TEXT)
-                elif label == "Article":
-                    st.markdown(DEFAULT_ARTICLE_TEXT)
+                # if label == "Upcoming Match":
+                #     st.markdown(DEFAULT_MATCH_TEXT)
+                # elif label == "Lesson":
+                #     st.markdown(DEFAULT_LESSON_TEXT)
+                # elif label == "Course":
+                #     st.markdown(DEFAULT_COURSE_TEXT)
+                # elif label == "Article":
+                #     st.markdown(DEFAULT_ARTICLE_TEXT)
