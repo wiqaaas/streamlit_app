@@ -1,19 +1,30 @@
 # ai_client.py
 
 import os
-import numpy as np
-import streamlit as st
 from dotenv import load_dotenv
+import pandas as pd
 from openai import OpenAI
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as rest
+from qdrant_client.http.exceptions import UnexpectedResponse
 
-# 1) Load .env
+# 1) Load environment
 load_dotenv()
 API_KEY = os.getenv("OPENAI_API_KEY")
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
+
 if not API_KEY:
     raise ValueError("Missing OPENAI_API_KEY in environment")
+if not QDRANT_URL:
+    raise ValueError("Missing QDRANT_URL in environment")
 
-# 2) Instantiate client
+# 2) Instantiate clients
 _client = OpenAI(api_key=API_KEY)
+_qdrant = QdrantClient(
+    url=QDRANT_URL,
+    api_key=QDRANT_API_KEY,
+)
 
 PROMPT_TEMPLATES = {
     "Upcoming Match": {
@@ -108,50 +119,45 @@ def chat_conversation(
 
 # ——— Embedding utilities ———
 
-@st.cache_data(show_spinner=False)
-def compute_row_embeddings(df) -> dict[int, list[float]]:
+def embed_text(text: str, model: str = "text-embedding-ada-002") -> list[float]:
     """
-    Given any pandas DataFrame, compute and cache an embedding for each row.
-    Returns a dict mapping row-index -> embedding vector.
-    """
-    row_embeds: dict[int, list[float]] = {}
-    for idx, row in df.iterrows():
-        # Concatenate all columns into one string for context
-        text = "  ".join(f"{col}: {row[col]}" for col in df.columns)
-        resp = _client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=[text]
-        )
-        row_embeds[idx] = resp.data[0].embedding
-    return row_embeds
-
-@st.cache_data(show_spinner=False)
-def embed_text(text: str) -> list[float]:
-    """
-    Embed an arbitrary piece of text (cached).
+    Embed an arbitrary piece of text via OpenAI.
     """
     resp = _client.embeddings.create(
-        model="text-embedding-ada-002",
+        model=model,
         input=[text]
     )
     return resp.data[0].embedding
 
-def find_best_row_index(
-    row_embeds: dict[int, list[float]],
-    prompt_emb: list[float]
-) -> int | None:
+def get_best_matching_row(category: str, prompt: str, top_k: int = 1) -> pd.DataFrame:
     """
-    Given precomputed row embeddings and a prompt embedding, return
-    the index of the most similar row (cosine similarity).
+    Embed the prompt, query the Qdrant collection for `category`,
+    and return the top-k payloads as a DataFrame.
     """
-    best_idx, best_score = None, -1.0
-    p_vec = np.array(prompt_emb)
-    p_norm = np.linalg.norm(p_vec)
+    collection = category.lower().replace(" ", "_")
+    # 1) embed the prompt
+    vector = embed_text(prompt)
 
-    for idx, emb in row_embeds.items():
-        r_vec = np.array(emb)
-        score = float(np.dot(p_vec, r_vec) / (p_norm * np.linalg.norm(r_vec)))
-        if score > best_score:
-            best_score, best_idx = score, idx
+    # 2) search Qdrant
+    try:
+        hits = _qdrant.search(
+            collection_name=collection,
+            query_vector=vector,
+            limit=top_k,
+            with_payload=True,
+            with_vector=False,
+        )
+    except UnexpectedResponse as e:
+        raise RuntimeError(f"Qdrant search failed: {e}")
 
-    return best_idx
+    # 3) extract payloads
+    rows = []
+    for hit in hits:
+        # each hit.payload is a dict of your original row
+        rows.append(hit.payload)
+
+    # 4) build DataFrame
+    if rows:
+        return pd.DataFrame(rows)
+    else:
+        return pd.DataFrame()
