@@ -38,77 +38,89 @@
 # DATA_DIR     = os.path.join('./streamlit_app', "data")
 
 # def main():
-#     # ─── Load environment variables ────────────────────────────────────────────
+#     # ─── Load API keys ─────────────────────────────────────────────────────────
 #     load_dotenv()
 #     API_KEY = os.getenv("OPENAI_API_KEY")
 #     if not API_KEY:
 #         raise ValueError("Missing OPENAI_API_KEY in environment")
 
-#     # ─── Instantiate clients ──────────────────────────────────────────────────
 #     openai_client = OpenAI(api_key=API_KEY)
-#     qdrant = QdrantClient(
+#     qdrant        = QdrantClient(
 #         url=os.getenv("QDRANT_URL", "http://localhost:6333"),
 #         api_key=os.getenv("QDRANT_API_KEY", None),
 #     )
 
-#     EMBEDDING_MODEL = "text-embedding-ada-002"
+#     # ─── Embedding settings ────────────────────────────────────────────────────
+#     EMBEDDING_MODEL = "text-embedding-3-small"
+#     VECTOR_SIZE     = 1536
 #     DISTANCE        = Distance.COSINE
+#     BATCH_SIZE      = 64
 
-#     # ─── Process each category interactively ──────────────────────────────────
 #     for category, fname in FILENAME_MAP.items():
-#         answer = input(f"\nProcess embeddings for category '{category}' "
-#                        f"(file '{fname}')? [y/n]: ").strip().lower()
-#         if answer not in ("y", "yes"):
+#         # Ask user whether to process this category
+#         ans = input(f"\nProcess embeddings for category '{category}' (file '{fname}')? [y/n]: ").strip().lower()
+#         if ans not in ("y", "yes"):
 #             print(f"→ Skipping '{category}'.")
 #             continue
 
-#         collection_name = category.lower().replace(" ", "_")
-#         file_path = os.path.join(DATA_DIR, fname)
-#         print(f"→ Loading '{fname}' for category '{category}'…")
-#         df = pd.read_excel(file_path)
+#         collection = category.lower().replace(" ", "_")
+#         df = pd.read_excel(os.path.join(DATA_DIR, fname))
 
-#         # 1) Create collection if it doesn't exist
-#         if not qdrant.collection_exists(collection_name):
+#         # Ensure collection exists
+#         if not qdrant.collection_exists(collection):
 #             qdrant.create_collection(
-#                 collection_name=collection_name,
-#                 vectors_config={"size": 1536, "distance": DISTANCE},
+#                 collection_name=collection,
+#                 vectors_config={"size": VECTOR_SIZE, "distance": DISTANCE},
 #             )
-#             print(f"   Created collection '{collection_name}'.")
-#         else:
-#             print(f"   Collection '{collection_name}' already exists; using it.")
 
-#         # 2) Compute & upsert embeddings in batches
-#         BATCH_SIZE = 64
+#         # Fetch existing IDs to skip already-processed rows
+#         points_list, _ = qdrant.scroll(
+#             collection_name=collection,
+#             limit=df.shape[0],
+#             with_payload=False
+#         )
+#         existing_ids = {pt.id for pt in points_list}
+#         print(f"→ Collection '{collection}' has {len(existing_ids)} rows already indexed.")
+
 #         batch = []
 #         for idx, row in df.iterrows():
-#             # a) Build row text
-#             text = "  ".join(f"{col}: {row[col]}" for col in df.columns)
-#             # b) Embed
-#             resp = openai_client.embeddings.create(
+#             if idx in existing_ids:
+#                 continue
+
+#             # Print progress
+#             print(f"Processing row index: {idx}")
+
+#             # a) Generate description
+#             desc = describe_row(openai_client, row)
+
+#             # b) Embed description
+#             emb = openai_client.embeddings.create(
 #                 model=EMBEDDING_MODEL,
-#                 input=[text],
-#             )
-#             emb = resp.data[0].embedding
+#                 input=[desc],
+#             ).data[0].embedding
+
 #             # c) Prepare payload
 #             payload = row.to_dict()
 #             payload.update({
-#                 "category":  category,
-#                 "row_index": int(idx),
+#                 "category":    category,
+#                 "row_index":   int(idx),
+#                 "description": desc,
 #             })
-#             # d) Append point
+
 #             batch.append(PointStruct(id=idx, vector=emb, payload=payload))
 
-#             # e) Flush batch
+#             # d) Flush batch
 #             if len(batch) >= BATCH_SIZE:
-#                 qdrant.upsert(collection_name=collection_name, points=batch)
-#                 batch = []
+#                 qdrant.upsert(collection_name=collection, points=batch)
+#                 batch.clear()
 
-#         # 3) Flush remaining
+#         # Flush any remaining points
 #         if batch:
-#             qdrant.upsert(collection_name=collection_name, points=batch)
+#             qdrant.upsert(collection_name=collection, points=batch)
 
-#         print(f"✅ Indexed {len(df)} rows into '{collection_name}'.")
+#         print(f"✅ Indexed new rows into '{collection}'")
 
-#     print("\n🎉 All done!")
+#     print("🎉 Done!")
+
 
 # main()
