@@ -6,7 +6,7 @@ import pandas as pd
 
 from config import TAB_LABELS
 from ai_client import generate_ad_copy, chat_conversation, PROMPT_TEMPLATES
-from modes.generate_mode import (
+from config import (
     DEFAULT_MATCH_TEXT,
     DEFAULT_LESSON_TEXT,
     DEFAULT_COURSE_TEXT,

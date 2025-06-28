@@ -13,6 +13,12 @@ from ai_client import (
     PROMPT_TEMPLATES,
 )
 from utils import init_history
+from config import (
+    DEFAULT_MATCH_TEXT,
+    DEFAULT_LESSON_TEXT,
+    DEFAULT_COURSE_TEXT,
+    DEFAULT_ARTICLE_TEXT,
+)
 
 # Compute project & data paths
 BASE_DIR     = os.path.dirname(__file__)
