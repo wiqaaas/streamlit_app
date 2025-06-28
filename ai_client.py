@@ -138,23 +138,17 @@ def get_best_matching_row(category: str, prompt: str, top_k: int = 1) -> pd.Data
     # 1) embed the prompt
     vector = embed_text(prompt)
 
-    # 2) search Qdrant
-    try:
-        hits = _qdrant.search(
-            collection_name=collection,
-            query_vector=vector,
-            limit=top_k,
-            with_payload=True,
-            with_vector=False,
-        )
-    except UnexpectedResponse as e:
-        raise RuntimeError(f"Qdrant search failed: {e}")
+    # 2) search Qdrant (only with_payload)
+    hits = _qdrant.search(
+        collection_name=collection,
+        query_vector=vector,
+        limit=top_k,
+        with_payload=True,    # <-- keep this
+        # remove with_vector argument entirely
+    )
 
     # 3) extract payloads
-    rows = []
-    for hit in hits:
-        # each hit.payload is a dict of your original row
-        rows.append(hit.payload)
+    rows = [hit.payload for hit in hits]
 
     # 4) build DataFrame
     if rows:
