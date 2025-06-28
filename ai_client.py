@@ -1,13 +1,10 @@
 # ai_client.py
 
 import os
-import pandas as pd
 import numpy as np
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
-
-from config import FILENAME_MAP, DATA_DIR, TAB_LABELS
 
 # 1) Load .env
 load_dotenv()
@@ -109,35 +106,30 @@ def chat_conversation(
     )
     return resp.choices[0].message.content
 
-# ——— Data + embedding logic ———
+# ——— Embedding utilities ———
 
 @st.cache_data(show_spinner=False)
-def load_data_and_embeddings(category: str) -> tuple[pd.DataFrame, dict[int, list[float]]]:
+def compute_row_embeddings(df) -> dict[int, list[float]]:
     """
-    Load the Excel file for this category and compute an embedding for each row (cached).
-    Returns (df, {row_index: embedding}).
+    Given any pandas DataFrame, compute and cache an embedding for each row.
+    Returns a dict mapping row-index -> embedding vector.
     """
-    if category not in FILENAME_MAP:
-        raise ValueError(f"No filename mapped for category “{category}”")
-    fname = FILENAME_MAP[category]
-    path = os.path.join(DATA_DIR, fname)
-    df = pd.read_excel(path)
-
     row_embeds: dict[int, list[float]] = {}
     for idx, row in df.iterrows():
-        # Build a single string containing all column names & values
+        # Concatenate all columns into one string for context
         text = "  ".join(f"{col}: {row[col]}" for col in df.columns)
         resp = _client.embeddings.create(
             model="text-embedding-ada-002",
             input=[text]
         )
         row_embeds[idx] = resp.data[0].embedding
-
-    return df, row_embeds
+    return row_embeds
 
 @st.cache_data(show_spinner=False)
 def embed_text(text: str) -> list[float]:
-    """Embed an arbitrary piece of text (cached)."""
+    """
+    Embed an arbitrary piece of text (cached).
+    """
     resp = _client.embeddings.create(
         model="text-embedding-ada-002",
         input=[text]
@@ -148,7 +140,10 @@ def find_best_row_index(
     row_embeds: dict[int, list[float]],
     prompt_emb: list[float]
 ) -> int | None:
-    """Return the row index whose embedding is most similar (cosine) to the prompt."""
+    """
+    Given precomputed row embeddings and a prompt embedding, return
+    the index of the most similar row (cosine similarity).
+    """
     best_idx, best_score = None, -1.0
     p_vec = np.array(prompt_emb)
     p_norm = np.linalg.norm(p_vec)
@@ -160,17 +155,3 @@ def find_best_row_index(
             best_score, best_idx = score, idx
 
     return best_idx
-
-def get_best_matching_row(category: str, prompt: str) -> pd.DataFrame:
-    """
-    Convenience wrapper: load data+embeddings, embed prompt, find best row,
-    and return it as a single-row DataFrame (or empty DF if no match).
-    """
-    df, row_embeds = load_data_and_embeddings(category)
-    prompt_emb = embed_text(prompt)
-    best_idx = find_best_row_index(row_embeds, prompt_emb)
-
-    if best_idx is not None:
-        return df.loc[[best_idx]]
-    else:
-        return pd.DataFrame(columns=df.columns)
