@@ -155,3 +155,72 @@ def get_best_matching_row(category: str, prompt: str, top_k: int = 1) -> pd.Data
         return pd.DataFrame(rows)
     else:
         return pd.DataFrame()
+
+# ─── Generate “fake row text” in the exact embedding format ─────────────────
+def generate_fake_row_text(
+    prompt: str,
+    columns: list[str],
+    chat_model: str = "gpt-4o",
+    temperature: float = 0.7
+) -> str:
+    """
+    Given a user prompt and the list of real column names,
+    ask the LLM to output a *single string* ready for embedding:
+      "ColA: valA  ColB: valB  ...  ColZ: valZ"
+    """
+    system = (
+        "You are a data synthesizer.  "
+        "A dataset was indexed by concatenating each column name with its cell value, "
+        "separated by ': ' and two spaces between columns.  "
+        "Given a description and the column names, produce exactly one line in that format."
+    )
+    user = (
+        f"Columns: {columns}\n\n"
+        f"Description: {prompt}\n\n"
+        "Return *only* the single-line text, for example:\n"
+        "  Col1: Foo  Col2: Bar  Col3: Baz"
+    )
+
+    resp = _client.chat.completions.create(
+        model=chat_model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user},
+        ],
+        temperature=temperature,
+    )
+    return resp.choices[0].message.content.strip()
+
+# ─── Search Qdrant using that fake row text ─────────────────────────────────
+def search_with_fake_row_ai(
+    category: str,
+    prompt: str,
+    columns: list[str],
+    top_k: int = 1,
+    embed_model: str = "text-embedding-ada-002",
+    chat_model: str = "gpt-4o"
+) -> pd.DataFrame:
+    """
+    1) Generate the single-line fake row text
+    2) Embed it exactly as you did for real rows
+    3) Query Qdrant nearest neighbors
+    4) Return those payloads as a DataFrame
+    """
+    # 1) Synthesize the text to embed
+    fake_text = generate_fake_row_text(prompt, columns, chat_model=chat_model)
+
+    # 2) Embed
+    vec = embed_text(fake_text, model=embed_model)
+
+    # 3) Search Qdrant
+    collection = category.lower().replace(" ", "_")
+    hits = _qdrant.search(
+        collection_name=collection,
+        query_vector=vec,
+        limit=top_k,
+        with_payload=True
+    )
+
+    # 4) Build DataFrame from payloads
+    rows = [hit.payload for hit in hits]
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
