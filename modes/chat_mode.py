@@ -36,27 +36,39 @@ def run_chat_mode():
             st.markdown("### 📊 Data Preview")
             st.dataframe(df, use_container_width=True)
 
-            # 3) Chat input
+            # 3) Chat input (use its own key, not the history key)
             history_key = f"history_{label.replace(' ', '_').lower()}"
+            input_key   = f"input_{label.replace(' ', '_').lower()}"
             init_history(history_key)
-            prompt = st.chat_input(f"Type a message about this data…", key=history_key)
+            prompt = st.chat_input(f"Type a message about this data…", key=input_key)
 
             if prompt:
-                # record user message
+                # record user message in history
                 st.session_state[history_key].append({"role": "user", "content": prompt})
 
-                # 4) Retrieve best-matching row via Qdrant through ai_client
+                # 4) Retrieve best-matching row via Qdrant
                 best_row = ai_client.get_best_matching_row(label, prompt)
 
                 if not best_row.empty:
                     st.markdown("### 🔍 Best Match")
                     st.dataframe(best_row, use_container_width=True)
+                    note = f"Displayed best match for “{prompt}”"
                 else:
                     st.info("No matching row found.")
+                    note = "No match found"
 
-                # record assistant note
-                note = f"Displayed best match for “{prompt}”" if not best_row.empty else "No match found"
+                # record assistant note to history
                 st.session_state[history_key].append({
                     "role": "assistant",
                     "content": note
                 })
+
+            # (Optional) Show chat history below, if you want
+            # older = st.session_state[history_key][:-2]
+            # with st.expander("📜 Previous Messages", expanded=False):
+            #     if not older:
+            #         st.info("No previous messages.")
+            #     else:
+            #         for msg in older:
+            #             with st.chat_message(msg["role"]):
+            #                 st.write(msg["content"])
