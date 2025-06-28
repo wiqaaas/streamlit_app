@@ -53,13 +53,17 @@ def run_chat_mode():
                 # record user message
                 st.session_state[hist_key].append({"role": "user", "content": prompt})
 
+                # grab one real example to teach the LLM the exact format
+                example_row = df.iloc[0].to_dict()
+
                 # run AI-driven fake-row search exactly once
-                best_df = search_with_fake_row_ai(
+                best_df = ai_client.search_with_fake_row_ai(
                     category=label,
                     prompt=prompt,
-                    columns=df.columns.tolist(),
-                    top_k=1,
+                    example_row=example_row,
+                    top_k=1
                 )
+
                 if not best_df.empty:
                     info = best_df.iloc[0].to_dict()
                     st.session_state[info_key] = info
