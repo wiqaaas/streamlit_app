@@ -4,8 +4,8 @@ import streamlit as st
 from utils import init_history
 from config import TAB_LABELS
 from modes.chat_mode import run_chat_mode
-#from modes.generate_mode import run_generate_mode
 from modes.filter_mode import run_filter_mode
+from modes.centralized_mode import run_centralized_mode
 
 # --- Page config ---
 st.set_page_config(
@@ -27,7 +27,7 @@ for lbl in TAB_LABELS:
 mode = st.sidebar.radio(
     "Select a mode",
     ("💬 Chat", 
-    #"⚙️ Generate", 
+    "⚙️ Centralized Generation", 
     "🔍 Filter & Generate"),
     index=0,
 )
@@ -39,8 +39,8 @@ st.sidebar.write("Built by MySportsAnalysis Ltd")
 if mode == "💬 Chat":
     run_chat_mode()
 
-# elif mode == "⚙️ Generate":
-#     run_generate_mode()
+elif mode == "⚙️ Centralized Generation":
+    run_centralized_mode()
 
 elif mode == "🔍 Filter & Generate":
     run_filter_mode()
