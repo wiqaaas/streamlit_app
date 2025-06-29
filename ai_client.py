@@ -119,7 +119,7 @@ def chat_conversation(
 
 # ——— Embedding utilities ———
 
-def embed_text(text: str, model: str = "text-embedding-ada-002") -> list[float]:
+def embed_text(text: str, model: str = "text-embedding-3-small") -> list[float]:
     resp = _client.embeddings.create(model=model, input=[text])
     return resp.data[0].embedding
 
