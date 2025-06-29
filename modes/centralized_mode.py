@@ -10,6 +10,7 @@ from ai_client import (
     generate_ad_copy,
     chat_conversation,
     PROMPT_TEMPLATES,
+    get_best_matching_row
 )
 from utils import init_history
 from config import (
