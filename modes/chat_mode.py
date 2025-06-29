@@ -7,7 +7,6 @@ import streamlit as st
 from config import TAB_LABELS, FILENAME_MAP
 import ai_client
 from ai_client import (
-    search_with_fake_row_ai,
     generate_ad_copy,
     chat_conversation,
     PROMPT_TEMPLATES,
