@@ -38,8 +38,21 @@ st.markdown("""
 # ─── Load & chunk data ────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    ELEARNING_COLS = [ … ]  # same as before
-    SCHEDULE_COLS  = [ … ]
+    ELEARNING_COLS = [
+        "Release Date","Link to page","LmsCourse","LmsContributor",
+        "Learning Path - Player Introductory","Learning Path - Player Beginner",
+        "Learning Path - Player Intermediate","Learning Path - Player Advanced",
+        "Learning Path - Coach Level 1","Learning Path - Coach Level 2",
+        "Learning Path - Coach Level 3","Learning Path - Coach Level 4",
+        "Learning Path - Umpire Level 1","Learning Path - Umpire Level 2",
+        "Learning Path - Umpire Level 3"
+    ]
+    SCHEDULE_COLS = [
+        "Release Date","Publicly Available on front end website",
+        "Link on Website for Social Media","Type / Template","Article Name",
+        "Club","Tournament","Handicap","Category 3","Category 4",
+        "Thumbnail","Video Highlight"
+    ]
     df_ele = load_sheet(ELEARNING_SOURCE, ELEARNING_COLS)
     df_sch = load_sheet(SCHEDULE_SOURCE,  SCHEDULE_COLS)
     ele_json = json.dumps(df_ele.to_dict("records"), ensure_ascii=False)
