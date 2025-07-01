@@ -66,20 +66,37 @@ def load_data():
 
 ele_chunks, sch_chunks = load_data()
 
-# ─── Session-state init ───────────────────────────────────────────
+# ─── Initialize session state ─────────────────────────────────────
 if "messages" not in st.session_state:
-    base_sys = {"role": "system", "content":
-                "You are PoloGPT, an expert polo‐social‐media strategist."}
-    date_sys = {"role": "system", "content":
-                f"Today is {date.today():%B %d, %Y}."}
+    base_sys = {
+        "role": "system",
+        "content": "You are PoloGPT, an expert polo‐social‐media strategist."
+    }
+    date_sys = {
+        "role": "system",
+        "content": f"Today is {date.today():%B %d, %Y}."
+    }
     st.session_state.messages = [base_sys, date_sys]
-    st.session_state.user_input = ""
-    st.session_state.last_reply = ""
+
+    # ── Context injection (now active) ───────────────────────────
+    # for c in sch_chunks:
+    #     st.session_state.messages.append({
+    #         "role": "system",
+    #         "content": f"<SCHEDULE_DATA>\n{c}"
+    #     })
+    # for c in ele_chunks:
+    #     st.session_state.messages.append({
+    #         "role": "system",
+    #         "content": f"<ELEARNING_DATA>\n{c}"
+    #     })
+
+    st.session_state.user_input  = ""
+    st.session_state.last_reply   = ""
     st.session_state.clear_input = False
 
 # ─── Clear input if flagged ───────────────────────────────────────
 if st.session_state.clear_input:
-    st.session_state.user_input = ""
+    st.session_state.user_input  = ""
     st.session_state.clear_input = False
 
 # ─── Build the UI ─────────────────────────────────────────────────
@@ -105,9 +122,12 @@ with col2:
 with col3:
     if st.button("🚀 Send") and user_text.strip():
         # Record user
-        st.session_state.messages.append({"role": "user", "content": user_text})
+        st.session_state.messages.append({
+            "role": "user",
+            "content": user_text
+        })
 
-        # Call GPT (with automatic summarization if needed)
+        # Call GPT (summarization and threshold logic lives inside chat_conversation)
         with st.spinner("PoloGPT is thinking…"):
             reply = chat_conversation(
                 st.session_state.messages,
@@ -116,13 +136,16 @@ with col3:
             )
 
         # Record and display reply
-        st.session_state.messages.append({"role": "assistant", "content": reply})
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": reply
+        })
         st.session_state.last_reply = reply
 
         # Clear input next run
         st.session_state.clear_input = True
 
-# Show reply below buttons
+# Show immediate reply below buttons
 if st.session_state.last_reply:
     st.markdown("**PoloGPT:**")
     st.write(st.session_state.last_reply)
