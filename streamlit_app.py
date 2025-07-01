@@ -9,7 +9,7 @@ from sheets import load_sheet
 from openai_client import chat_conversation
 from utils import chunk_json
 
-# ─── Load env & config ────────────────────────────────────────────
+# ─── Load env & validate ──────────────────────────────────────────
 BASE = Path(__file__).parent
 load_dotenv(BASE / ".env")
 ELEARNING_SOURCE = os.getenv("ELEARNING_SOURCE")
@@ -18,8 +18,9 @@ if not ELEARNING_SOURCE or not SCHEDULE_SOURCE:
     st.error("❌ Please set ELEARNING_SOURCE and SCHEDULE_SOURCE in .env")
     st.stop()
 
-# ─── Button styling ────────────────────────────────────────────────
-st.markdown("""
+# ─── Button CSS ──────────────────────────────────────────────────
+st.markdown(
+    """
     <style>
     button[data-baseweb="button"] {
         background-color: #1e81b0;
@@ -33,12 +34,14 @@ st.markdown("""
         background-color: #18658f;
     }
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
-# ─── Load & chunk data ────────────────────────────────────────────
+# ─── Load & chunk your JSON sheets (cached) ───────────────────────
 @st.cache_data
 def load_data():
-    ELEARNING_COLS = [
+    ELEARNING_COLS = [  # same as before
         "Release Date","Link to page","LmsCourse","LmsContributor",
         "Learning Path - Player Introductory","Learning Path - Player Beginner",
         "Learning Path - Player Intermediate","Learning Path - Player Advanced",
@@ -61,50 +64,47 @@ def load_data():
 
 ele_chunks, sch_chunks = load_data()
 
-# ─── Session‐state initialization ─────────────────────────────────
+# ─── Initialize session state once ────────────────────────────────
 if "messages" not in st.session_state:
-    base_sys = {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist."}
-    date_sys = {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
-    st.session_state.messages = [base_sys, date_sys]
-
-    # ── Context injection (commented out) ──────────────────────────
+    # Base system prompts
+    st.session_state.messages = [
+        {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist."},
+        {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
+    ]
+    # ── Context injection, uncomment if needed ──────────────────────
     # for c in sch_chunks:
     #     st.session_state.messages.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
     # for c in ele_chunks:
     #     st.session_state.messages.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
 
-    st.session_state.has_sent     = False
-    st.session_state.last_reply   = ""
-    st.session_state.user_input   = ""
-    st.session_state.clear_input  = False
-
-# ─── Handle input clearing ────────────────────────────────────────
-if st.session_state.clear_input:
-    st.session_state.user_input  = ""
-    st.session_state.clear_input = False
+    st.session_state.has_sent   = False   # hide/replace Send after first click
+    st.session_state.last_reply = ""      # store immediate reply
 
 # ─── Build the UI ─────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Enter your prompt; once you send, the Send button will be replaced by Modify buttons.")
+st.write("Enter your prompt; after the first send, only Modify buttons will appear.")
 
-# — Text area at top —
-user_text = st.text_area(
-    "Your message",
-    value=st.session_state.user_input,
-    key="user_input",
-    height=150
-)
-
-# — Action buttons —
+# ─── Initial send stage ──────────────────────────────────────────
 if not st.session_state.has_sent:
-    if st.button("🚀 Send") and user_text.strip():
+    with st.form("send_form", clear_on_submit=True):
+        user_text = st.text_area("Your message", height=150)
+        send = st.form_submit_button("🚀 Send")
+    if send and user_text.strip():
+        # Record user message
         st.session_state.messages.append({"role":"user","content":user_text})
+        # Call GPT (handles summarization internally)
         with st.spinner("PoloGPT is thinking…"):
-            reply = chat_conversation(st.session_state.messages, model="gpt-4.1-mini", token_threshold=1000)
+            reply = chat_conversation(
+                st.session_state.messages,
+                model="gpt-4.1-mini",
+                token_threshold=1000
+            )
+        # Record assistant reply
         st.session_state.messages.append({"role":"assistant","content":reply})
         st.session_state.last_reply  = reply
         st.session_state.has_sent    = True
-        st.session_state.clear_input = True
+
+# ─── Modify stage ─────────────────────────────────────────────────
 else:
     col1, col2 = st.columns(2)
     with col1:
@@ -112,7 +112,11 @@ else:
             prompt = "Please modify the ad based on the above."
             st.session_state.messages.append({"role":"user","content":prompt})
             with st.spinner("PoloGPT is thinking…"):
-                reply = chat_conversation(st.session_state.messages, model="gpt-4.1-mini", token_threshold=1000)
+                reply = chat_conversation(
+                    st.session_state.messages,
+                    model="gpt-4.1-mini",
+                    token_threshold=1000
+                )
             st.session_state.messages.append({"role":"assistant","content":reply})
             st.session_state.last_reply = reply
     with col2:
@@ -120,11 +124,15 @@ else:
             prompt = "Please modify the content based on the above."
             st.session_state.messages.append({"role":"user","content":prompt})
             with st.spinner("PoloGPT is thinking…"):
-                reply = chat_conversation(st.session_state.messages, model="gpt-4.1-mini", token_threshold=1000)
+                reply = chat_conversation(
+                    st.session_state.messages,
+                    model="gpt-4.1-mini",
+                    token_threshold=1000
+                )
             st.session_state.messages.append({"role":"assistant","content":reply})
             st.session_state.last_reply = reply
 
-# — Show immediate reply below —
+# ─── Display only the immediate assistant reply ───────────────────
 if st.session_state.last_reply:
     st.markdown("**PoloGPT:**")
     st.write(st.session_state.last_reply)
