@@ -62,14 +62,14 @@ if "messages" not in st.session_state:
             "You are PoloGPT, an expert polo-social-media strategist."
         }
     ]
-    for c in sch_chunks:
-        st.session_state.messages.append(
-            {"role": "system", "content": f"<SCHEDULE_DATA>\n{c}"}
-        )
-    for c in ele_chunks:
-        st.session_state.messages.append(
-            {"role": "system", "content": f"<ELEARNING_DATA>\n{c}"}
-        )
+    # for c in sch_chunks:
+    #     st.session_state.messages.append(
+    #         {"role": "system", "content": f"<SCHEDULE_DATA>\n{c}"}
+    #     )
+    # for c in ele_chunks:
+    #     st.session_state.messages.append(
+    #         {"role": "system", "content": f"<ELEARNING_DATA>\n{c}"}
+    #     )
     today_str = date.today().strftime("%B %d, %Y")
     st.session_state.messages.append(
         {"role": "system", "content": f"Today is {today_str}."}
