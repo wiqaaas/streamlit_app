@@ -35,10 +35,10 @@ button[data-baseweb="button"]:hover {
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Load & chunk data ────────────────────────────────────────────
+# ─── Load & chunk your sheets ─────────────────────────────────────
 @st.cache_data
 def load_data():
-    ELEARNING_COLS = [  # same as before
+    ELEARNING_COLS = [
         "Release Date","Link to page","LmsCourse","LmsContributor",
         "Learning Path - Player Introductory","Learning Path - Player Beginner",
         "Learning Path - Player Intermediate","Learning Path - Player Advanced",
@@ -67,63 +67,60 @@ if "messages" not in st.session_state:
         {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist."},
         {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
     ]
-    # ── Context injection (commented out) ──────────────────────────
+    # ── Context injection (comment out if you like) ───────────────
     # for c in sch_chunks:
-    #     st.session_state.messages.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
+    #     st.session_state.messages.append({"role":"system","content":f"<SCHEDULE_DATA>\\n{c}"})
     # for c in ele_chunks:
-    #     st.session_state.messages.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
-    st.session_state.has_sent   = False   # hide Send once clicked
-    st.session_state.last_reply = ""      # store latest reply
+    #     st.session_state.messages.append({"role":"system","content":f"<ELEARNING_DATA>\\n{c}"})
+    st.session_state.has_sent   = False   # tracks first‐send
+    st.session_state.last_reply = ""      # store only the immediate reply
+
+# ─── Helper to send a prompt and capture reply ────────────────────
+def process_prompt(prompt: str):
+    st.session_state.messages.append({"role":"user","content":prompt})
+    with st.spinner("PoloGPT is thinking…"):
+        reply = chat_conversation(
+            st.session_state.messages,
+            model="gpt-4.1-mini",
+            token_threshold=1000
+        )
+    st.session_state.messages.append({"role":"assistant","content":reply})
+    st.session_state.last_reply = reply
 
 # ─── Build the UI ─────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Type your message and click Send. Afterwards, use Modify buttons to send more.")
+st.write("Type your message below. After your first Send, it becomes Modify buttons.")
 
-# — Always-visible text area (keyed so we can read it)
-message = st.text_area("Your message", key="message_input", height=150)
+# — Always‐visible text area —
+message = st.text_area("Your message", height=150, key="msg")
 
-# — First‐click Send button
+# — Placeholder for action buttons —
+action_ph = st.empty()
+
+# — First‐click: show Send; after clicking, swap to Modify immediately —
 if not st.session_state.has_sent:
-    if st.button("🚀 Send") and message.strip():
-        # send the user message
-        st.session_state.messages.append({"role":"user","content":message})
-        with st.spinner("PoloGPT is thinking…"):
-            reply = chat_conversation(
-                st.session_state.messages,
-                model="gpt-4.1-mini",
-                token_threshold=1000
-            )
-        st.session_state.messages.append({"role":"assistant","content":reply})
-        st.session_state.last_reply = reply
-        st.session_state.has_sent   = True
-
-# — After send: show Modify buttons that act like “Send”
+    with action_ph.container():
+        if st.button("🚀 Send") and message.strip():
+            process_prompt(message.strip())
+            st.session_state.has_sent = True
+            # in the same run, clear and redraw for Modify buttons:
+            action_ph.empty()
+            with action_ph.container():
+                col1, col2 = st.columns(2)
+                if col1.button("✏️ Modify Ad") and message.strip():
+                    process_prompt(message.strip())
+                if col2.button("🖋️ Modify Content") and message.strip():
+                    process_prompt(message.strip())
 else:
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("✏️ Modify Ad") and message.strip():
-            st.session_state.messages.append({"role":"user","content":message})
-            with st.spinner("PoloGPT is thinking…"):
-                reply = chat_conversation(
-                    st.session_state.messages,
-                    model="gpt-4.1-mini",
-                    token_threshold=1000
-                )
-            st.session_state.messages.append({"role":"assistant","content":reply})
-            st.session_state.last_reply = reply
-    with col2:
-        if st.button("🖋️ Modify Content") and message.strip():
-            st.session_state.messages.append({"role":"user","content":message})
-            with st.spinner("PoloGPT is thinking…"):
-                reply = chat_conversation(
-                    st.session_state.messages,
-                    model="gpt-4.1-mini",
-                    token_threshold=1000
-                )
-            st.session_state.messages.append({"role":"assistant","content":reply})
-            st.session_state.last_reply = reply
+    # — After first send: show Modify Ad / Modify Content —
+    with action_ph.container():
+        col1, col2 = st.columns(2)
+        if col1.button("✏️ Modify Ad") and message.strip():
+            process_prompt(message.strip())
+        if col2.button("🖋️ Modify Content") and message.strip():
+            process_prompt(message.strip())
 
-# — Display only the most recent assistant reply
+# — Display only the immediate GPT reply —
 if st.session_state.last_reply:
     st.markdown("**PoloGPT:**")
     st.write(st.session_state.last_reply)
