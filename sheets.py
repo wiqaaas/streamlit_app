@@ -1,23 +1,20 @@
 # sheets.py
-import os
-from pathlib import Path
+from google.colab import auth
+from google.auth import default
 import gspread
 from gspread_dataframe import get_as_dataframe
-from dotenv import load_dotenv
 
-# Load your .env if you need sheet URLs or other config
-BASE = Path(__file__).parent
-load_dotenv(BASE / ".env")
-
-# Pick up the key via env var (standard Google pattern)
-KEYFILE = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", str(BASE / "service_account.json"))
-if not Path(KEYFILE).is_file():
-    raise FileNotFoundError(f"Couldn’t find service account JSON at {KEYFILE}")
-
-# Create one client for all calls
-_gc = gspread.service_account(filename=KEYFILE)
+# ——— INTERACTIVE AUTH ———
+# This will trigger the Colab OAuth prompt the first time you import sheets.py
+auth.authenticate_user()
+creds, _ = default()
+_gc = gspread.authorize(creds)
 
 def load_sheet(url: str, ws_name: str, cols: list):
+    """
+    Uses your interactive Google login to open the sheet at `url`,
+    pulls worksheet `ws_name`, filters to `cols`, and returns a DataFrame.
+    """
     sh = _gc.open_by_url(url)
     ws = sh.worksheet(ws_name)
     df = get_as_dataframe(ws)
