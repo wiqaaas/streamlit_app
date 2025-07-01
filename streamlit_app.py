@@ -15,8 +15,10 @@ load_dotenv(BASE / ".env")
 
 ELEARNING_SOURCE = os.getenv("ELEARNING_SOURCE")
 SCHEDULE_SOURCE  = os.getenv("SCHEDULE_SOURCE")
-USE_CONTEXT      = os.getenv("USE_CONTEXT", "false").lower() in ("1","true","yes")
+
+USE_CONTEXT      = True
 USE_EXAMPLES     = True 
+TOKEN_THRESHOLD  = 900_000  # 900k tokens for gpt-4.1-mini
 
 if not ELEARNING_SOURCE or not SCHEDULE_SOURCE:
     st.error("❌ Please set ELEARNING_SOURCE and SCHEDULE_SOURCE in .env")
@@ -97,7 +99,7 @@ def modify_content(prompt: str):
 
 def _call_and_record(history, prompt, to_hist=None):
     with st.spinner("PoloGPT is thinking…"):
-        reply = chat_conversation(history + [{"role":"user","content":prompt}], model="gpt-4.1-mini", token_threshold=1000)
+        reply = chat_conversation(history + [{"role":"user","content":prompt}], model="gpt-4.1-mini", token_threshold=TOKEN_THRESHOLD)
     # record
     if to_hist is None: to_hist = history
     to_hist.append({"role":"user","content":prompt})
