@@ -9,7 +9,7 @@ from sheets import load_sheet
 from openai_client import chat_conversation
 from utils import chunk_json
 
-# ─── Load environment variables ───────────────────────────────────
+# ─── Load environment variables ────────────────────────────────────
 BASE = Path(__file__).parent
 load_dotenv(BASE / ".env")
 
@@ -40,7 +40,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─── Columns config ───────────────────────────────────────────────
+# ─── Define which columns to pull ─────────────────────────────────
 ELEARNING_COLS = [
     "Release Date","Link to page","LmsCourse","LmsContributor",
     "Learning Path - Player Introductory","Learning Path - Player Beginner",
@@ -57,7 +57,7 @@ SCHEDULE_COLS = [
     "Thumbnail","Video Highlight"
 ]
 
-# ─── Load & chunk data ────────────────────────────────────────────
+# ─── Load & chunk your JSON dumps ────────────────────────────────
 @st.cache_data
 def load_data():
     df_ele = load_sheet(ELEARNING_SOURCE, ELEARNING_COLS)
@@ -68,52 +68,41 @@ def load_data():
 
 ele_chunks, sch_chunks = load_data()
 
-# ─── Session-state init ───────────────────────────────────────────
+# ─── Initialize session state ─────────────────────────────────────
 if "messages" not in st.session_state:
-    # system prompt + optional context
     st.session_state.messages = [
-        {"role": "system", "content":
-            "You are PoloGPT, an expert polo‐social‐media strategist."
-        }
+        {"role": "system", "content": "You are PoloGPT, an expert polo‐social‐media strategist."}
     ]
-    # ── chunk-data injection commented out ────────────────────────
+    # ── context injection (commented out) ─────────────────────────
     # for c in sch_chunks:
-    #     st.session_state.messages.append(
-    #         {"role": "system", "content": f"<SCHEDULE_DATA>\n{c}"}
-    #     )
+    #     st.session_state.messages.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
     # for c in ele_chunks:
-    #     st.session_state.messages.append(
-    #         {"role": "system", "content": f"<ELEARNING_DATA>\n{c}"}
-    #     )
+    #     st.session_state.messages.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
 
     # date context
     today_str = date.today().strftime("%B %d, %Y")
-    st.session_state.messages.append(
-        {"role": "system", "content": f"Today is {today_str}."}
-    )
+    st.session_state.messages.append({"role":"system","content":f"Today is {today_str}."})
 
-    # chat history & input state
-    st.session_state.history     = []
     st.session_state.user_input  = ""
     st.session_state.clear_input = False
+    st.session_state.last_reply   = ""
 
-# ─── Handle input-clearing flag ───────────────────────────────────
+# ─── Handle clearing the input box ────────────────────────────────
 if st.session_state.clear_input:
     st.session_state.user_input  = ""
     st.session_state.clear_input = False
 
-# ─── UI ──────────────────────────────────────────────────────────
+# ─── Build the UI ────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Weave in your schedule & e-learning data — continue the convo below.")
+st.write("Enter your prompt and let PoloGPT respond immediately.")
 
-# render history
-for msg in st.session_state.history:
-    if msg["role"] == "user":
-        st.markdown(f"**You:** {msg['content']}")
-    else:
-        st.markdown(f"**PoloGPT:** {msg['content']}")
+# Show only the last assistant reply (if any)
+if st.session_state.last_reply:
+    st.markdown("**PoloGPT:**")
+    st.write(st.session_state.last_reply)
+    st.markdown("---")
 
-# modify buttons
+# Modify buttons
 col1, col2 = st.columns(2)
 with col1:
     if st.button("✏️ Modify Ad"):
@@ -122,7 +111,7 @@ with col2:
     if st.button("🖋️ Modify Content"):
         st.session_state.user_input = "Please modify the content based on the above."
 
-# chat input
+# Chat input
 user_text = st.text_area(
     "Your message",
     value=st.session_state.user_input,
@@ -130,19 +119,17 @@ user_text = st.text_area(
     height=150
 )
 
-# send
+# Send
 if st.button("🚀 Send") and user_text.strip():
-    # append user
-    st.session_state.messages.append({"role": "user",    "content": user_text})
-    st.session_state.history.append( {"role": "user",    "content": user_text})
-
-    # call GPT
+    # Append user message to the conversation history
+    st.session_state.messages.append({"role":"user","content":user_text})
+    # Call GPT with full history
     with st.spinner("PoloGPT is thinking…"):
         reply = chat_conversation(st.session_state.messages, model="gpt-4.1-mini")
 
-    # append assistant
-    st.session_state.messages.append({"role": "assistant","content": reply})
-    st.session_state.history.append( {"role": "assistant","content": reply})
+    # Append assistant reply to history and store for display
+    st.session_state.messages.append({"role":"assistant","content":reply})
+    st.session_state.last_reply   = reply
 
-    # set clear flag (next run clears input)
+    # Clear input on next run
     st.session_state.clear_input = True
