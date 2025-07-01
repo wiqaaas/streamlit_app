@@ -12,7 +12,7 @@ if not _api_key:
 
 _client = OpenAI(api_key=_api_key)
 
-def get_completion(messages: list, model: str = "gpt-4o-mini", temperature: float = 0.3) -> str:
+def get_completion(messages: list, model: str = "gpt-4.1-mini", temperature: float = 0.3) -> str:
     resp = _client.chat.completions.create(
         model=model,
         messages=messages,
