@@ -14,7 +14,7 @@ load_dotenv(BASE / ".env")
 
 ELEARNING_SOURCE = os.getenv("ELEARNING_SOURCE")
 SCHEDULE_SOURCE  = os.getenv("SCHEDULE_SOURCE")
-USE_CONTEXT      = "false"
+USE_CONTEXT      = False
 
 if not ELEARNING_SOURCE or not SCHEDULE_SOURCE:
     st.error("❌ Please set ELEARNING_SOURCE and SCHEDULE_SOURCE in .env")
