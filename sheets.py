@@ -5,7 +5,7 @@ import gspread
 from gspread_dataframe import get_as_dataframe
 
 # ——— INTERACTIVE AUTH ———
-# This will trigger the Colab OAuth prompt the first time you import sheets.py
+# On first import this will pop up the Google sign-in/consent UI.
 auth.authenticate_user()
 creds, _ = default()
 _gc = gspread.authorize(creds)
