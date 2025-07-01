@@ -1,4 +1,3 @@
-# streamlit_app.py
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -10,12 +9,13 @@ from sheets import load_sheet
 from openai_client import chat_conversation
 from utils import chunk_json
 
-# ─── Load env & config ───────────────────────────────────────────
+# ─── Load env ─────────────────────────────────────────────────────
 BASE = Path(__file__).parent
 load_dotenv(BASE / ".env")
 
 ELEARNING_SOURCE = os.getenv("ELEARNING_SOURCE")
 SCHEDULE_SOURCE  = os.getenv("SCHEDULE_SOURCE")
+
 if not ELEARNING_SOURCE or not SCHEDULE_SOURCE:
     st.error("❌ Please set ELEARNING_SOURCE and SCHEDULE_SOURCE in .env")
     st.stop()
@@ -40,10 +40,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─── Load & chunk data ───────────────────────────────────────────
+# ─── Load & chunk data ────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    ELEARNING_COLS = [  # same as before
+    ELEARNING_COLS = [
         "Release Date","Link to page","LmsCourse","LmsContributor",
         "Learning Path - Player Introductory","Learning Path - Player Beginner",
         "Learning Path - Player Intermediate","Learning Path - Player Advanced",
@@ -66,73 +66,63 @@ def load_data():
 
 ele_chunks, sch_chunks = load_data()
 
-# ─── Session‐state init ──────────────────────────────────────────
+# ─── Session-state init ───────────────────────────────────────────
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role":"system","content":
-            "You are PoloGPT, an expert polo‐social‐media strategist."
-        }
-    ]
-    # injection (commented)
-    # for c in sch_chunks:
-    #     st.session_state.messages.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
-    # for c in ele_chunks:
-    #     st.session_state.messages.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
-    st.session_state.messages.append({
-        "role":"system", 
-        "content": f"Today is {date.today():%B %d, %Y}."
-    })
-    st.session_state.user_input = ""   # seed for the textarea
-    st.session_state.last_reply  = ""  # what we show
+    base_sys = {"role": "system", "content":
+                "You are PoloGPT, an expert polo‐social‐media strategist."}
+    date_sys = {"role": "system", "content":
+                f"Today is {date.today():%B %d, %Y}."}
+    st.session_state.messages = [base_sys, date_sys]
+    st.session_state.user_input = ""
+    st.session_state.last_reply = ""
+    st.session_state.clear_input = False
 
-# ─── Page UI ─────────────────────────────────────────────────────
+# ─── Clear input if flagged ───────────────────────────────────────
+if st.session_state.clear_input:
+    st.session_state.user_input = ""
+    st.session_state.clear_input = False
+
+# ─── Build the UI ─────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Enter your prompt and get PoloGPT’s reply below.")
+st.write("Enter your prompt and see PoloGPT’s reply below.")
 
-# placeholder for the single reply
-reply_ph = st.empty()
-if st.session_state.last_reply:
-    reply_ph.markdown("**PoloGPT:**")
-    reply_ph.write(st.session_state.last_reply)
-    st.markdown("---")
+# Input at top
+user_text = st.text_area(
+    "Your message",
+    value=st.session_state.user_input,
+    key="user_input",
+    height=150
+)
 
-# two Modify buttons
-col1, col2 = st.columns(2)
+# Modify & Send buttons
+col1, col2, col3 = st.columns([0.5, 0.5, 1])
 with col1:
     if st.button("✏️ Modify Ad"):
         st.session_state.user_input = "Please modify the ad based on the above."
 with col2:
     if st.button("🖋️ Modify Content"):
         st.session_state.user_input = "Please modify the content based on the above."
+with col3:
+    if st.button("🚀 Send") and user_text.strip():
+        # Record user
+        st.session_state.messages.append({"role": "user", "content": user_text})
 
-# ── The form groups textarea + submit, so one click works ────────
-with st.form("chat_form"):
-    user_text = st.text_area(
-        "Your message", 
-        value=st.session_state.user_input,
-        height=150
-    )
-    submitted = st.form_submit_button("🚀 Send")
+        # Call GPT (with automatic summarization if needed)
+        with st.spinner("PoloGPT is thinking…"):
+            reply = chat_conversation(
+                st.session_state.messages,
+                model="gpt-4.1-mini",
+                token_threshold=1000
+            )
 
-# ── When the form is submitted, handle it immediately ────────────
-if submitted and user_text.strip():
-    # record user in the back‐end history
-    st.session_state.messages.append({"role":"user","content":user_text})
+        # Record and display reply
+        st.session_state.messages.append({"role": "assistant", "content": reply})
+        st.session_state.last_reply = reply
 
-    # call GPT
-    with st.spinner("PoloGPT is thinking…"):
-        reply = chat_conversation(
-            st.session_state.messages,
-            model="gpt-4.1-mini"
-        )
+        # Clear input next run
+        st.session_state.clear_input = True
 
-    # record in back‐end and display
-    st.session_state.messages.append({"role":"assistant","content":reply})
-    st.session_state.last_reply = reply
-
-    # reset seed so next form is blank
-    st.session_state.user_input = ""
-
-    # show immediately
-    reply_ph.markdown("**PoloGPT:**")
-    reply_ph.write(reply)
+# Show reply below buttons
+if st.session_state.last_reply:
+    st.markdown("**PoloGPT:**")
+    st.write(st.session_state.last_reply)
