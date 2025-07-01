@@ -91,7 +91,7 @@ if send_clicked and message.strip():
     st.session_state.ad_messages.append({"role":"user","content":message.strip()})
     st.session_state.ad_messages.append({"role":"assistant","content":reply})
     st.session_state.content_messages.append({"role":"user","content":message.strip()})
-    st.session_state.content_messages.append({"role":"assistant","content":reply)
+    st.session_state.content_messages.append({"role":"assistant","content":reply})
 
 # — Modify buttons (appear immediately when send_clicked or has_sent) —
 if st.session_state.has_sent or send_clicked:
