@@ -1,3 +1,13 @@
+# ─── streamlit_app.py ────────────────────────────────────────
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# 1) Find your .env next to this file
+BASE = Path(__file__).parent
+load_dotenv(BASE / ".env")
+
+# 2) Now import Streamlit (after loading .env)
 import streamlit as st
 import json
 from datetime import date
@@ -6,7 +16,7 @@ from sheets import load_sheet
 from openai_client import get_completion
 from utils import chunk_json
 
-# ——— CONFIGURATION ———
+# ─── CONFIGURATION ───────────────────────────────────────────
 ELEARNING_URL = os.getenv("ELEARNING_SHEET_URL")
 SCHEDULE_URL  = os.getenv("SCHEDULE_SHEET_URL")
 
