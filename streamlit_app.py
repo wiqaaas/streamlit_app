@@ -43,7 +43,7 @@ st.markdown(
 # ─── Load & chunk your JSON data ─────────────────────────────────
 @st.cache_data
 def load_data():
-    ELEARNING_COLS = [  # same columns list as before
+    ELEARNING_COLS = [  # same as before
         "Release Date","Link to page","LmsCourse","LmsContributor",
         "Learning Path - Player Introductory","Learning Path - Player Beginner",
         "Learning Path - Player Intermediate","Learning Path - Player Advanced",
@@ -66,26 +66,22 @@ def load_data():
 
 ele_chunks, sch_chunks = load_data()
 
-# ─── Session-state initialization ────────────────────────────────
+# ─── Initialize session state ─────────────────────────────────────
 if "messages" not in st.session_state:
-    # Start convo with system prompts
     st.session_state.messages = [
         {"role": "system", "content":
             "You are PoloGPT, an expert polo‐social‐media strategist."
         }
     ]
-    # ── Context injection (commented out) ───────────────────────────
+    # Context injection (commented out)
     # for c in sch_chunks:
     #     st.session_state.messages.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
     # for c in ele_chunks:
     #     st.session_state.messages.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
-    # Add date context
     st.session_state.messages.append({
         "role": "system",
         "content": f"Today is {date.today():%B %d, %Y}."
     })
-
-    # State for the input box, clear flag, and last reply
     st.session_state.user_input  = ""
     st.session_state.clear_input = False
     st.session_state.last_reply   = ""
@@ -95,17 +91,14 @@ if st.session_state.clear_input:
     st.session_state.user_input  = ""
     st.session_state.clear_input = False
 
-# ─── Build the UI ─────────────────────────────────────────────────
+# ─── Build the UI ────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Enter your prompt and see PoloGPT’s immediate reply below.")
+st.write("Enter your prompt and see PoloGPT’s reply immediately below.")
 
-# Show only the latest assistant reply
-if st.session_state.last_reply:
-    st.markdown("**PoloGPT:**")
-    st.write(st.session_state.last_reply)
-    st.markdown("---")
+# Prepare a placeholder for the reply
+reply_placeholder = st.empty()
 
-# Modify buttons (pre-fill the input box)
+# Modify buttons
 col1, col2 = st.columns(2)
 with col1:
     if st.button("✏️ Modify Ad"):
@@ -114,7 +107,7 @@ with col2:
     if st.button("🖋️ Modify Content"):
         st.session_state.user_input = "Please modify the content based on the above."
 
-# Text area for user input (seeded from session state)
+# Chat input
 user_text = st.text_area(
     "Your message",
     value=st.session_state.user_input,
@@ -122,21 +115,27 @@ user_text = st.text_area(
     height=150
 )
 
-# Send button
+# Send
 if st.button("🚀 Send") and user_text.strip():
-    # 1) Record user input
+    # 1) Record user message
     st.session_state.messages.append({"role":"user","content":user_text})
 
     # 2) Call the model
     with st.spinner("PoloGPT is thinking…"):
-        reply = chat_conversation(
-            st.session_state.messages,
-            model="gpt-4.1-mini"
-        )
+        reply = chat_conversation(st.session_state.messages, model="gpt-4.1-mini")
 
-    # 3) Record and display only this reply
+    # 3) Record reply internally
     st.session_state.messages.append({"role":"assistant","content":reply})
     st.session_state.last_reply = reply
 
-    # 4) Flag to clear the input box on next run
+    # 4) Flag to clear input next run
     st.session_state.clear_input = True
+
+    # 5) Show the reply right away
+    reply_placeholder.markdown("**PoloGPT:**")
+    reply_placeholder.write(reply)
+
+# If no new send but we have a last_reply (e.g. on reload), show it
+elif st.session_state.last_reply:
+    reply_placeholder.markdown("**PoloGPT:**")
+    reply_placeholder.write(st.session_state.last_reply)
