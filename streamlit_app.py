@@ -9,7 +9,7 @@ from sheets import load_sheet
 from openai_client import chat_conversation
 from utils import chunk_json
 
-# ─── Load environment variables ────────────────────────────────────
+# ─── Load environment variables ───────────────────────────────────
 BASE = Path(__file__).parent
 load_dotenv(BASE / ".env")
 
@@ -40,26 +40,24 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─── Define which columns to pull ─────────────────────────────────
-ELEARNING_COLS = [
-    "Release Date","Link to page","LmsCourse","LmsContributor",
-    "Learning Path - Player Introductory","Learning Path - Player Beginner",
-    "Learning Path - Player Intermediate","Learning Path - Player Advanced",
-    "Learning Path - Coach Level 1","Learning Path - Coach Level 2",
-    "Learning Path - Coach Level 3","Learning Path - Coach Level 4",
-    "Learning Path - Umpire Level 1","Learning Path - Umpire Level 2",
-    "Learning Path - Umpire Level 3"
-]
-SCHEDULE_COLS = [
-    "Release Date","Publicly Available on front end website",
-    "Link on Website for Social Media","Type / Template","Article Name",
-    "Club","Tournament","Handicap","Category 3","Category 4",
-    "Thumbnail","Video Highlight"
-]
-
-# ─── Load & chunk your JSON dumps ────────────────────────────────
+# ─── Load & chunk your JSON data ─────────────────────────────────
 @st.cache_data
 def load_data():
+    ELEARNING_COLS = [  # same columns list as before
+        "Release Date","Link to page","LmsCourse","LmsContributor",
+        "Learning Path - Player Introductory","Learning Path - Player Beginner",
+        "Learning Path - Player Intermediate","Learning Path - Player Advanced",
+        "Learning Path - Coach Level 1","Learning Path - Coach Level 2",
+        "Learning Path - Coach Level 3","Learning Path - Coach Level 4",
+        "Learning Path - Umpire Level 1","Learning Path - Umpire Level 2",
+        "Learning Path - Umpire Level 3"
+    ]
+    SCHEDULE_COLS = [
+        "Release Date","Publicly Available on front end website",
+        "Link on Website for Social Media","Type / Template","Article Name",
+        "Club","Tournament","Handicap","Category 3","Category 4",
+        "Thumbnail","Video Highlight"
+    ]
     df_ele = load_sheet(ELEARNING_SOURCE, ELEARNING_COLS)
     df_sch = load_sheet(SCHEDULE_SOURCE,  SCHEDULE_COLS)
     ele_json = json.dumps(df_ele.to_dict("records"), ensure_ascii=False)
@@ -68,41 +66,46 @@ def load_data():
 
 ele_chunks, sch_chunks = load_data()
 
-# ─── Initialize session state ─────────────────────────────────────
+# ─── Session-state initialization ────────────────────────────────
 if "messages" not in st.session_state:
+    # Start convo with system prompts
     st.session_state.messages = [
-        {"role": "system", "content": "You are PoloGPT, an expert polo‐social‐media strategist."}
+        {"role": "system", "content":
+            "You are PoloGPT, an expert polo‐social‐media strategist."
+        }
     ]
-    # ── context injection (commented out) ─────────────────────────
+    # ── Context injection (commented out) ───────────────────────────
     # for c in sch_chunks:
     #     st.session_state.messages.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
     # for c in ele_chunks:
     #     st.session_state.messages.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
+    # Add date context
+    st.session_state.messages.append({
+        "role": "system",
+        "content": f"Today is {date.today():%B %d, %Y}."
+    })
 
-    # date context
-    today_str = date.today().strftime("%B %d, %Y")
-    st.session_state.messages.append({"role":"system","content":f"Today is {today_str}."})
-
+    # State for the input box, clear flag, and last reply
     st.session_state.user_input  = ""
     st.session_state.clear_input = False
     st.session_state.last_reply   = ""
 
-# ─── Handle clearing the input box ────────────────────────────────
+# ─── Clear input if flagged ───────────────────────────────────────
 if st.session_state.clear_input:
     st.session_state.user_input  = ""
     st.session_state.clear_input = False
 
-# ─── Build the UI ────────────────────────────────────────────────
+# ─── Build the UI ─────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Enter your prompt and let PoloGPT respond immediately.")
+st.write("Enter your prompt and see PoloGPT’s immediate reply below.")
 
-# Show only the last assistant reply (if any)
+# Show only the latest assistant reply
 if st.session_state.last_reply:
     st.markdown("**PoloGPT:**")
     st.write(st.session_state.last_reply)
     st.markdown("---")
 
-# Modify buttons
+# Modify buttons (pre-fill the input box)
 col1, col2 = st.columns(2)
 with col1:
     if st.button("✏️ Modify Ad"):
@@ -111,7 +114,7 @@ with col2:
     if st.button("🖋️ Modify Content"):
         st.session_state.user_input = "Please modify the content based on the above."
 
-# Chat input
+# Text area for user input (seeded from session state)
 user_text = st.text_area(
     "Your message",
     value=st.session_state.user_input,
@@ -119,17 +122,21 @@ user_text = st.text_area(
     height=150
 )
 
-# Send
+# Send button
 if st.button("🚀 Send") and user_text.strip():
-    # Append user message to the conversation history
+    # 1) Record user input
     st.session_state.messages.append({"role":"user","content":user_text})
-    # Call GPT with full history
+
+    # 2) Call the model
     with st.spinner("PoloGPT is thinking…"):
-        reply = chat_conversation(st.session_state.messages, model="gpt-4.1-mini")
+        reply = chat_conversation(
+            st.session_state.messages,
+            model="gpt-4.1-mini"
+        )
 
-    # Append assistant reply to history and store for display
+    # 3) Record and display only this reply
     st.session_state.messages.append({"role":"assistant","content":reply})
-    st.session_state.last_reply   = reply
+    st.session_state.last_reply = reply
 
-    # Clear input on next run
+    # 4) Flag to clear the input box on next run
     st.session_state.clear_input = True
