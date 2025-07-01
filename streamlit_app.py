@@ -9,11 +9,14 @@ from sheets import load_sheet
 from openai_client import chat_conversation
 from utils import chunk_json
 
-# ─── Load & validate env ─────────────────────────────────────────
+# ─── Load env & config ────────────────────────────────────────────
 BASE = Path(__file__).parent
 load_dotenv(BASE / ".env")
+
 ELEARNING_SOURCE = os.getenv("ELEARNING_SOURCE")
 SCHEDULE_SOURCE  = os.getenv("SCHEDULE_SOURCE")
+USE_CONTEXT      = "true"
+
 if not ELEARNING_SOURCE or not SCHEDULE_SOURCE:
     st.error("❌ Please set ELEARNING_SOURCE and SCHEDULE_SOURCE in .env")
     st.stop()
@@ -35,7 +38,7 @@ button[data-baseweb="button"]:hover {
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Load & chunk your sheets ─────────────────────────────────────
+# ─── Load & chunk JSON data ───────────────────────────────────────
 @st.cache_data
 def load_data():
     ELEARNING_COLS = [
@@ -61,21 +64,30 @@ def load_data():
 
 ele_chunks, sch_chunks = load_data()
 
-# ─── Initialize session state ─────────────────────────────────────
+# ─── Session‐state initialization ─────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist."},
         {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
     ]
-    # ── Context injection (comment out if you like) ───────────────
-    # for c in sch_chunks:
-    #     st.session_state.messages.append({"role":"system","content":f"<SCHEDULE_DATA>\\n{c}"})
-    # for c in ele_chunks:
-    #     st.session_state.messages.append({"role":"system","content":f"<ELEARNING_DATA>\\n{c}"})
-    st.session_state.has_sent   = False   # tracks first‐send
-    st.session_state.last_reply = ""      # store only the immediate reply
 
-# ─── Helper to send a prompt and capture reply ────────────────────
+    # ── Conditionally inject context ────────────────────────────────
+    if USE_CONTEXT:
+        for c in sch_chunks:
+            st.session_state.messages.append({
+                "role":"system",
+                "content": f"<SCHEDULE_DATA>\n{c}"
+            })
+        for c in ele_chunks:
+            st.session_state.messages.append({
+                "role":"system",
+                "content": f"<ELEARNING_DATA>\n{c}"
+            })
+
+    st.session_state.has_sent   = False
+    st.session_state.last_reply = ""
+
+# ─── Helper to process a prompt and update state ─────────────────
 def process_prompt(prompt: str):
     st.session_state.messages.append({"role":"user","content":prompt})
     with st.spinner("PoloGPT is thinking…"):
@@ -89,7 +101,7 @@ def process_prompt(prompt: str):
 
 # ─── Build the UI ─────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Type your message below. After your first Send, it becomes Modify buttons.")
+st.write("Type your message below. After the first Send, Send will be replaced by Modify buttons.")
 
 # — Always‐visible text area —
 message = st.text_area("Your message", height=150, key="msg")
@@ -97,22 +109,14 @@ message = st.text_area("Your message", height=150, key="msg")
 # — Placeholder for action buttons —
 action_ph = st.empty()
 
-# — First‐click: show Send; after clicking, swap to Modify immediately —
+# ─── First click: Send button ─────────────────────────────────────
 if not st.session_state.has_sent:
     with action_ph.container():
         if st.button("🚀 Send") and message.strip():
             process_prompt(message.strip())
             st.session_state.has_sent = True
-            # in the same run, clear and redraw for Modify buttons:
-            action_ph.empty()
-            with action_ph.container():
-                col1, col2 = st.columns(2)
-                if col1.button("✏️ Modify Ad") and message.strip():
-                    process_prompt(message.strip())
-                if col2.button("🖋️ Modify Content") and message.strip():
-                    process_prompt(message.strip())
+# ─── Subsequent clicks: Modify buttons ────────────────────────────
 else:
-    # — After first send: show Modify Ad / Modify Content —
     with action_ph.container():
         col1, col2 = st.columns(2)
         if col1.button("✏️ Modify Ad") and message.strip():
@@ -120,7 +124,7 @@ else:
         if col2.button("🖋️ Modify Content") and message.strip():
             process_prompt(message.strip())
 
-# — Display only the immediate GPT reply —
+# ─── Display only the immediate assistant reply ───────────────────
 if st.session_state.last_reply:
     st.markdown("**PoloGPT:**")
     st.write(st.session_state.last_reply)

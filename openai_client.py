@@ -13,7 +13,7 @@ if not _api_key:
 
 _client = OpenAI(api_key=_api_key)
 
-# ─── Helpers ──────────────────────────────────────────────────────
+# ─── Core Helpers ─────────────────────────────────────────────────
 def get_completion(
     messages: list[dict],
     model: str = "gpt-4.1-mini",
@@ -38,6 +38,7 @@ def _summarize_history(
     model: str,
     temperature: float
 ) -> str:
+    # Only user and assistant turns go into the summary prompt
     convo = "\n".join(
         f"{m['role']}: {m['content']}"
         for m in messages
@@ -56,21 +57,24 @@ def _prepare_messages(
     temperature: float
 ) -> list[dict]:
     """
-    If token count ≤ threshold: return messages as-is.
-    Otherwise: summarize user+assistant turns into one SYSTEM message.
+    If total tokens ≤ threshold: return messages as-is.
+    Otherwise:
+      1) keep ONLY the system messages
+      2) summarize all user+assistant turns into one system message
+      3) return [<all_system_msgs>, <HISTORY_SUMMARY>]
     """
     if _count_tokens(messages, model) <= threshold:
         return messages
 
-    # summarize and reset history
+    # 1) Pull out all system messages
+    system_messages = [m for m in messages if m["role"] == "system"]
+
+    # 2) Summarize the chat turns
     summary = _summarize_history(messages, model, temperature)
-    base = messages[0]   # your initial SYSTEM
-    date = messages[1]   # your "Today is ..." SYSTEM
-    return [
-        base,
-        date,
-        {"role": "system", "content": f"<HISTORY_SUMMARY>\n{summary}"}
-    ]
+    summary_msg = {"role": "system", "content": f"<HISTORY_SUMMARY>\n{summary}"}
+
+    # 3) Return system context + summary
+    return system_messages + [summary_msg]
 
 # ─── Public API ──────────────────────────────────────────────────
 def chat_conversation(
@@ -81,7 +85,8 @@ def chat_conversation(
 ) -> str:
     """
     Continue a chat given a list of messages.
-    Automatically summarizes if over `token_threshold`.
+    Automatically summarizes if over `token_threshold`, 
+    **while preserving ALL system messages**.
     Returns the assistant’s reply.
     """
     to_send = _prepare_messages(messages, token_threshold, model, temperature)
