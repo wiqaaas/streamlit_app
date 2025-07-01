@@ -42,7 +42,7 @@ ele_chunks, sch_chunks = load_data(ELEARNING_SOURCE, SCHEDULE_SOURCE)
 
 # ─── Session‐state initialization ─────────────────────────────────
 if "base_messages" not in st.session_state:
-    # Build base system context
+    # build base system context
     base = [
         {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist."},
         {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
@@ -52,15 +52,16 @@ if "base_messages" not in st.session_state:
             base.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
         for c in ele_chunks:
             base.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
+
+    # store in session
     st.session_state.base_messages    = base
-    st.session_state.has_sent         = False
-    st.session_state.last_reply       = ""
-    # Create two separate histories, initially copies of base
     st.session_state.ad_messages      = list(base)
     st.session_state.content_messages = list(base)
+    st.session_state.has_sent         = False
+    st.session_state.last_reply       = ""
 
-# ─── Helper to process a prompt on a given session list ────────────
-def process_on(messages_list, prompt: str):
+# ─── Helper to append and get reply ───────────────────────────────
+def send_to(messages_list, prompt: str):
     messages_list.append({"role":"user","content":prompt})
     with st.spinner("PoloGPT is thinking…"):
         reply = chat_conversation(
@@ -75,21 +76,30 @@ def process_on(messages_list, prompt: str):
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
 st.write("Type your message. After first Send, you get Modify Ad / Modify Content sessions.")
 
-# — Always‐visible text area —
-message = st.text_area("Your message", height=150, key="message_input")
+# always-visible text area
+message = st.text_area("Your message", height=150, key="msg")
 
-# — Placeholder for action buttons —
+# placeholder for buttons
 action_ph = st.empty()
 
 # ─── Initial Send stage ──────────────────────────────────────────
 if not st.session_state.has_sent:
     with action_ph.container():
         if st.button("🚀 Send") and message.strip():
-            # Process on base -> initial reply
-            reply = process_on(st.session_state.base_messages, message.strip())
+            # 1) send to base_messages
+            reply = send_to(st.session_state.base_messages, message.strip())
             st.session_state.last_reply = reply
-            st.session_state.has_sent   = True
-    # Show that initial reply below
+
+            # 2) seed both ad_messages & content_messages
+            st.session_state.ad_messages.append({"role":"user","content":message.strip()})
+            st.session_state.ad_messages.append({"role":"assistant","content":reply})
+            st.session_state.content_messages.append({"role":"user","content":message.strip()})
+            st.session_state.content_messages.append({"role":"assistant","content":reply})
+
+            # 3) flip flag
+            st.session_state.has_sent = True
+
+    # show initial reply
     if st.session_state.last_reply:
         st.markdown("**PoloGPT:**")
         st.write(st.session_state.last_reply)
@@ -98,16 +108,16 @@ if not st.session_state.has_sent:
 else:
     with action_ph.container():
         col1, col2 = st.columns(2)
-        # Modify Ad session
+        # Modify Ad thread
         if col1.button("✏️ Modify Ad") and message.strip():
-            reply = process_on(st.session_state.ad_messages, message.strip())
+            reply = send_to(st.session_state.ad_messages, message.strip())
             st.session_state.last_reply = reply
-        # Modify Content session
+        # Modify Content thread
         if col2.button("🖋️ Modify Content") and message.strip():
-            reply = process_on(st.session_state.content_messages, message.strip())
+            reply = send_to(st.session_state.content_messages, message.strip())
             st.session_state.last_reply = reply
 
-    # Show only the immediate reply whichever session ran
+    # display only the immediate follow-up reply
     if st.session_state.last_reply:
         st.markdown("**PoloGPT:**")
         st.write(st.session_state.last_reply)
