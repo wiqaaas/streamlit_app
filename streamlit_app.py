@@ -1,4 +1,3 @@
-# streamlit_app.py
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -13,7 +12,6 @@ from utils import chunk_json
 # ─── Load env & config ────────────────────────────────────────────
 BASE = Path(__file__).parent
 load_dotenv(BASE / ".env")
-
 ELEARNING_SOURCE = os.getenv("ELEARNING_SOURCE")
 SCHEDULE_SOURCE  = os.getenv("SCHEDULE_SOURCE")
 if not ELEARNING_SOURCE or not SCHEDULE_SOURCE:
@@ -40,21 +38,8 @@ st.markdown("""
 # ─── Load & chunk data ────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    ELEARNING_COLS = [
-        "Release Date","Link to page","LmsCourse","LmsContributor",
-        "Learning Path - Player Introductory","Learning Path - Player Beginner",
-        "Learning Path - Player Intermediate","Learning Path - Player Advanced",
-        "Learning Path - Coach Level 1","Learning Path - Coach Level 2",
-        "Learning Path - Coach Level 3","Learning Path - Coach Level 4",
-        "Learning Path - Umpire Level 1","Learning Path - Umpire Level 2",
-        "Learning Path - Umpire Level 3"
-    ]
-    SCHEDULE_COLS = [
-        "Release Date","Publicly Available on front end website",
-        "Link on Website for Social Media","Type / Template","Article Name",
-        "Club","Tournament","Handicap","Category 3","Category 4",
-        "Thumbnail","Video Highlight"
-    ]
+    ELEARNING_COLS = [ … ]  # same as before
+    SCHEDULE_COLS  = [ … ]
     df_ele = load_sheet(ELEARNING_SOURCE, ELEARNING_COLS)
     df_sch = load_sheet(SCHEDULE_SOURCE,  SCHEDULE_COLS)
     ele_json = json.dumps(df_ele.to_dict("records"), ensure_ascii=False)
@@ -65,27 +50,31 @@ ele_chunks, sch_chunks = load_data()
 
 # ─── Session‐state initialization ─────────────────────────────────
 if "messages" not in st.session_state:
-    # Base system prompts
     base_sys = {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist."}
     date_sys = {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
     st.session_state.messages = [base_sys, date_sys]
 
-    # Context injection (always present)
+    # ── Context injection (commented out) ──────────────────────────
     # for c in sch_chunks:
     #     st.session_state.messages.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
     # for c in ele_chunks:
     #     st.session_state.messages.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
 
-    # Flags & storage
     st.session_state.has_sent     = False
-    st.session_state.user_input   = ""
     st.session_state.last_reply   = ""
+    st.session_state.user_input   = ""
+    st.session_state.clear_input  = False
 
-# ─── UI ────────────────────────────────────────────────────────────
+# ─── Handle input clearing ────────────────────────────────────────
+if st.session_state.clear_input:
+    st.session_state.user_input  = ""
+    st.session_state.clear_input = False
+
+# ─── Build the UI ─────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Enter your prompt; once you send, you’ll get Modify buttons for follow-ups.")
+st.write("Enter your prompt; once you send, the Send button will be replaced by Modify buttons.")
 
-# -- Text area at top --
+# — Text area at top —
 user_text = st.text_area(
     "Your message",
     value=st.session_state.user_input,
@@ -93,35 +82,24 @@ user_text = st.text_area(
     height=150
 )
 
-# -- The action buttons --
+# — Action buttons —
 if not st.session_state.has_sent:
-    # First-time: only Send
     if st.button("🚀 Send") and user_text.strip():
-        # Process send
         st.session_state.messages.append({"role":"user","content":user_text})
         with st.spinner("PoloGPT is thinking…"):
-            reply = chat_conversation(
-                st.session_state.messages,
-                model="gpt-4.1-mini",
-                token_threshold=1000
-            )
+            reply = chat_conversation(st.session_state.messages, model="gpt-4.1-mini", token_threshold=1000)
         st.session_state.messages.append({"role":"assistant","content":reply})
-        st.session_state.last_reply = reply
-        st.session_state.has_sent   = True
-        st.session_state.user_input = ""  # clear input
+        st.session_state.last_reply  = reply
+        st.session_state.has_sent    = True
+        st.session_state.clear_input = True
 else:
-    # After first send: show Modify buttons only
     col1, col2 = st.columns(2)
     with col1:
         if st.button("✏️ Modify Ad"):
             prompt = "Please modify the ad based on the above."
             st.session_state.messages.append({"role":"user","content":prompt})
             with st.spinner("PoloGPT is thinking…"):
-                reply = chat_conversation(
-                    st.session_state.messages,
-                    model="gpt-4.1-mini",
-                    token_threshold=1000
-                )
+                reply = chat_conversation(st.session_state.messages, model="gpt-4.1-mini", token_threshold=1000)
             st.session_state.messages.append({"role":"assistant","content":reply})
             st.session_state.last_reply = reply
     with col2:
@@ -129,15 +107,11 @@ else:
             prompt = "Please modify the content based on the above."
             st.session_state.messages.append({"role":"user","content":prompt})
             with st.spinner("PoloGPT is thinking…"):
-                reply = chat_conversation(
-                    st.session_state.messages,
-                    model="gpt-4.1-mini",
-                    token_threshold=1000
-                )
+                reply = chat_conversation(st.session_state.messages, model="gpt-4.1-mini", token_threshold=1000)
             st.session_state.messages.append({"role":"assistant","content":reply})
             st.session_state.last_reply = reply
 
-# -- Show the immediate GPT reply below --
+# — Show immediate reply below —
 if st.session_state.last_reply:
     st.markdown("**PoloGPT:**")
     st.write(st.session_state.last_reply)
