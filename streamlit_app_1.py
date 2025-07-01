@@ -38,7 +38,7 @@ if st.session_state.clear_input:
     st.session_state.clear_input  = False
 
 # ─── Page UI ─────────────────────────────────────────────────────
-st.title("🏇 PoloGPT Chatbot (single-send + context checkbox)")
+st.title("🏇 PoloGPT Chatbot ")
 st.write("Toggle “Include context” to add schedule & e-learning data, then Send.")
 
 # Checkbox to include or skip context injection
