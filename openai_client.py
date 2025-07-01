@@ -81,7 +81,7 @@ def chat_conversation(
     messages: list[dict],
     model: str = "gpt-4.1-mini",
     temperature: float = 0.3,
-    token_threshold: int = 1000
+    token_threshold: int = 900000
 ) -> str:
     """
     Continue a chat given a list of messages.
