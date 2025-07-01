@@ -1,4 +1,3 @@
-# streamlit_app.py
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -10,15 +9,14 @@ from sheets import load_sheet
 from openai_client import get_completion
 from utils import chunk_json
 
-# ——— LOAD ENV ———
+# ——— Load environment variables ———
 BASE = Path(__file__).parent
 load_dotenv(BASE / ".env")
 
-ELEARNING_URL = os.getenv("ELEARNING_SHEET_URL")
-SCHEDULE_URL  = os.getenv("SCHEDULE_SHEET_URL")
-
-if not ELEARNING_URL or not SCHEDULE_URL:
-    st.error("❌ Please set ELEARNING_SHEET_URL and SCHEDULE_SHEET_URL in .env")
+ELEARNING_SOURCE = os.getenv("ELEARNING_SOURCE")
+SCHEDULE_SOURCE  = os.getenv("SCHEDULE_SOURCE")
+if not ELEARNING_SOURCE or not SCHEDULE_SOURCE:
+    st.error("❌ Please set ELEARNING_SOURCE and SCHEDULE_SOURCE in .env")
     st.stop()
 
 ELEARNING_COLS = [
@@ -37,11 +35,11 @@ SCHEDULE_COLS = [
     "Thumbnail","Video Highlight"
 ]
 
-# ——— LOAD & CHUNK DATA ———
+# ——— Load & chunk JSON data ———
 @st.cache_data
 def load_data():
-    df_ele = load_sheet(ELEARNING_URL, "Pathway", ELEARNING_COLS)
-    df_sch = load_sheet(SCHEDULE_URL,  "Article Schedule", SCHEDULE_COLS)
+    df_ele = load_sheet(ELEARNING_SOURCE, ELEARNING_COLS)
+    df_sch = load_sheet(SCHEDULE_SOURCE,  SCHEDULE_COLS)
     ele_json = json.dumps(df_ele.to_dict(orient="records"), ensure_ascii=False)
     sch_json = json.dumps(df_sch.to_dict(orient="records"), ensure_ascii=False)
     return chunk_json(ele_json), chunk_json(sch_json)
@@ -59,13 +57,11 @@ if st.button("Send"):
             "You are PoloGPT, an expert polo‐social‐media strategist."
         }
     ]
-    # inject data
-    # for c in sch_chunks:
-    #     messages.append({"role": "system", "content": f"<SCHEDULE_DATA>\n{c}"})
-    # for c in ele_chunks:
-    #     messages.append({"role": "system", "content": f"<ELEARNING_DATA>\n{c}"})
+    for c in sch_chunks:
+        messages.append({"role": "system", "content": f"<SCHEDULE_DATA>\n{c}"})
+    for c in ele_chunks:
+        messages.append({"role": "system", "content": f"<ELEARNING_DATA>\n{c}"})
 
-    # date context + user prompt
     today_str = date.today().strftime("%B %d, %Y")
     messages.append({"role": "system", "content": f"Today is {today_str}."})
     messages.append({"role": "user",   "content": user_prompt})

@@ -1,21 +1,23 @@
-# sheets.py
-from google.colab import auth
-from google.auth import default
-import gspread
-from gspread_dataframe import get_as_dataframe
+import json
+from pathlib import Path
+import pandas as pd
+from dotenv import load_dotenv
 
-# ——— INTERACTIVE AUTH ———
-# On first import this will pop up the Google sign-in/consent UI.
-auth.authenticate_user()
-creds, _ = default()
-_gc = gspread.authorize(creds)
+# Load .env if you need it here (not strictly required)
+BASE = Path(__file__).parent
+load_dotenv(dotenv_path=BASE / ".env")
 
-def load_sheet(url: str, ws_name: str, cols: list):
+def load_sheet(source: str, cols: list) -> pd.DataFrame:
     """
-    Uses your interactive Google login to open the sheet at `url`,
-    pulls worksheet `ws_name`, filters to `cols`, and returns a DataFrame.
+    Load a local JSON file (dumped from Colab) into a DataFrame,
+    then filter to the requested columns.
     """
-    sh = _gc.open_by_url(url)
-    ws = sh.worksheet(ws_name)
-    df = get_as_dataframe(ws)
+    path = Path(source)
+    if not path.is_file():
+        raise FileNotFoundError(f"No such file: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    df = pd.DataFrame(data)
+    missing = set(cols) - set(df.columns)
+    if missing:
+        raise KeyError(f"Missing columns in {path.name}: {missing}")
     return df[cols]
