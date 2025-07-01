@@ -7,8 +7,8 @@ from openai_client import get_completion
 from utils import chunk_json
 
 # ——— CONFIGURATION ———
-ELEARNING_URL = st.secrets.get("ELEARNING_SHEET_URL") or st.session_state.get("ELEARNING_SHEET_URL")
-SCHEDULE_URL  = st.secrets.get("SCHEDULE_SHEET_URL")  or st.session_state.get("SCHEDULE_SHEET_URL")
+ELEARNING_URL = os.getenv("ELEARNING_SHEET_URL")
+SCHEDULE_URL  = os.getenv("SCHEDULE_SHEET_URL")
 
 ELEARNING_COLS = [
     "Release Date", "Link to page", "LmsCourse", "LmsContributor",
