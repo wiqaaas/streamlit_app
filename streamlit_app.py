@@ -57,10 +57,10 @@ if st.button("Send"):
             "You are PoloGPT, an expert polo‐social‐media strategist."
         }
     ]
-    for c in sch_chunks:
-        messages.append({"role": "system", "content": f"<SCHEDULE_DATA>\n{c}"})
-    for c in ele_chunks:
-        messages.append({"role": "system", "content": f"<ELEARNING_DATA>\n{c}"})
+    # for c in sch_chunks:
+    #     messages.append({"role": "system", "content": f"<SCHEDULE_DATA>\n{c}"})
+    # for c in ele_chunks:
+    #     messages.append({"role": "system", "content": f"<ELEARNING_DATA>\n{c}"})
 
     today_str = date.today().strftime("%B %d, %Y")
     messages.append({"role": "system", "content": f"Today is {today_str}."})
