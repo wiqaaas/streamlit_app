@@ -49,7 +49,7 @@ example_chunks = chunk_json(example_posts_json)
 if "base_messages" not in st.session_state:
     # 1) Base system prompts
     base = [
-        {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist."},
+        {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist. You know how to craft posts in JSON with keys Platform, Topic, Content."},
         {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
     ]
 
