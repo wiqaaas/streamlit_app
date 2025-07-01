@@ -16,16 +16,17 @@ load_dotenv(BASE / ".env")
 
 ELEARNING_SOURCE        = os.getenv("ELEARNING_SOURCE")
 SCHEDULE_SOURCE         = os.getenv("SCHEDULE_SOURCE")
-
-MAX_TOKEN_LIMIT             = 10000 
-DEFAULT_FALLBACK_MESSAGE    = "Your request was too long; please shorten it and try again."
+MAX_TOKEN_LIMIT         = int(os.getenv("MAX_TOKEN_LIMIT", 10000))
+DEFAULT_FALLBACK_MESSAGE = os.getenv(
+    "DEFAULT_FALLBACK_MESSAGE",
+    "Your request was too long; please shorten it and try again."
+)
 
 if not ELEARNING_SOURCE or not SCHEDULE_SOURCE:
     st.error("❌ Please set ELEARNING_SOURCE and SCHEDULE_SOURCE in .env")
     st.stop()
 
-
-# ─── Columns ─────────────────────────────────────────────────────
+# ─── Constants ───────────────────────────────────────────────────
 ELEARNING_COLS = [
     "Release Date","Link to page","LmsCourse","LmsContributor",
     "Learning Path - Player Introductory","Learning Path - Player Beginner",
@@ -53,49 +54,102 @@ def load_data():
 
 ele_chunks, sch_chunks = load_data()
 
-# ─── UI ─────────────────────────────────────────────────────────
-st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Enter your prompt and I’ll weave in your schedule & e-learning data.")
-
-user_prompt = st.text_area("Your prompt", height=150)
-
-if st.button("Send"):
-    # Build full messages
-    messages = [
+# ─── Initialize chat state ───────────────────────────────────────
+if "messages" not in st.session_state:
+    # System & context injection only once
+    st.session_state.messages = [
         {"role": "system", "content":
-            "You are PoloGPT, an expert polo‐social‐media strategist."
+            "You are PoloGPT, an expert polo-social-media strategist."
         }
     ]
-    # for c in sch_chunks:
-    #     messages.append({"role": "system", "content": f"<SCHEDULE_DATA>\n{c}"})
-    # for c in ele_chunks:
-    #     messages.append({"role": "system", "content": f"<ELEARNING_DATA>\n{c}"})
+    for c in sch_chunks:
+        st.session_state.messages.append(
+            {"role": "system", "content": f"<SCHEDULE_DATA>\n{c}"}
+        )
+    for c in ele_chunks:
+        st.session_state.messages.append(
+            {"role": "system", "content": f"<ELEARNING_DATA>\n{c}"}
+        )
     today_str = date.today().strftime("%B %d, %Y")
-    messages.append({"role": "system", "content": f"Today is {today_str}."})
-    messages.append({"role": "user",   "content": user_prompt})
+    st.session_state.messages.append(
+        {"role": "system", "content": f"Today is {today_str}."}
+    )
+    # History for display (excludes system messages)
+    st.session_state.history = []
 
-    # ── Count tokens ─────────────────────────────────────────────
+if "user_input" not in st.session_state:
+    st.session_state.user_input = ""
+
+# ─── UI ─────────────────────────────────────────────────────────
+st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
+st.write("Weave in your schedule & e-learning data — continue the convo below.")
+
+# Display the chat history
+for entry in st.session_state.history:
+    if entry["role"] == "user":
+        st.markdown(f"**You:** {entry['content']}")
+    else:
+        st.markdown(f"**PoloGPT:** {entry['content']}")
+
+# Input box for next user message
+st.text_area(
+    "Your message",
+    key="user_input",
+    height=150
+)
+
+# The three action buttons
+col1, col2, col3 = st.columns(3)
+with col1:
+    send_clicked = st.button("Send")
+with col2:
+    mod_ad = st.button("Modify Ad")
+with col3:
+    mod_content = st.button("Modify Content")
+
+# If either modify button is clicked, pre-fill the input box
+if mod_ad:
+    st.session_state.user_input = "Please modify the ad based on the above."
+if mod_content:
+    st.session_state.user_input = "Please modify the content based on the above."
+
+# When Send is clicked, append and call the API
+if send_clicked and st.session_state.user_input.strip():
+    user_msg = st.session_state.user_input.strip()
+
+    # Append user message to session
+    st.session_state.messages.append({"role": "user", "content": user_msg})
+    st.session_state.history.append({"role": "user", "content": user_msg})
+
+    # Count tokens
     try:
-        encoder = tiktoken.encoding_for_model("gpt-4.1-mini")
-    except Exception:
-        encoder = tiktoken.get_encoding("cl100k_base")
-    token_count = sum(len(encoder.encode(m["content"])) for m in messages)
+        enc = tiktoken.encoding_for_model("gpt-4.1-mini")
+    except:
+        enc = tiktoken.get_encoding("cl100k_base")
+    token_count = sum(len(enc.encode(m["content"])) for m in st.session_state.messages)
     st.write(f"**Token count:** {token_count}")
 
-    # ── If over limit, fallback ──────────────────────────────────
+    # Decide fallback or full convo
     if token_count > MAX_TOKEN_LIMIT:
         st.warning(f"Token count ({token_count}) exceeds the limit of {MAX_TOKEN_LIMIT}.")
-        fallback_msgs = [
+        prompt = [
             {"role": "system", "content":
-                "You are PoloGPT, an expert polo‐social‐media strategist."
-            },
+                "You are PoloGPT, an expert polo-social-media strategist."},
             {"role": "user", "content": DEFAULT_FALLBACK_MESSAGE}
         ]
-        with st.spinner("Thinking…"):
-            answer = get_completion(fallback_msgs, model="gpt-4.1-mini")
     else:
-        with st.spinner("Thinking…"):
-            answer = get_completion(messages, model="gpt-4.1-mini")
+        prompt = st.session_state.messages
 
-    st.markdown("**PoloGPT says:**")
-    st.write(answer)
+    # Call the API
+    with st.spinner("PoloGPT is thinking…"):
+        reply = get_completion(prompt, model="gpt-4.1-mini")
+
+    # Save assistant reply
+    st.session_state.messages.append({"role": "assistant", "content": reply})
+    st.session_state.history.append({"role": "assistant", "content": reply})
+
+    # Clear input box
+    st.session_state.user_input = ""
+
+    # Rerun to display updated history
+    st.experimental_rerun()
