@@ -9,6 +9,8 @@ from example_posts import example_posts_json
 from openai_client import chat_conversation
 from utils import chunk_json
 
+import prompts
+
 # ─── Load env & config ────────────────────────────────────────────
 BASE = Path(__file__).parent
 load_dotenv(BASE / ".env")
@@ -16,7 +18,7 @@ load_dotenv(BASE / ".env")
 ELEARNING_SOURCE = os.getenv("ELEARNING_SOURCE")
 SCHEDULE_SOURCE  = os.getenv("SCHEDULE_SOURCE")
 MATCHES_SOURCE   = os.getenv("MATCHES_SOURCE")
-USE_CONTEXT      = True
+USE_CONTEXT      = False
 USE_EXAMPLES     = True 
 TOKEN_THRESHOLD  = 900_000  # 900k tokens for gpt-4.1-mini
 
@@ -53,32 +55,49 @@ example_chunks = chunk_json(example_posts_json)
 if "messages" not in st.session_state:
     # 1) Base system prompts
     base = [
-        {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist. You know how to craft posts in JSON with keys Platform, Topic, Content."},
-        {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
+        {"role":"system","content":prompts.system_prompt},
+        {"role":"system","content":f"Today is {date.today():%Y-%m-%d}."}
     ]
 
-    # 2) Optionally inject schedule, e-learning, and upcoming matches
+    # 2) Optionally inject schedule and e-learning
     if USE_CONTEXT:
-        # for c in sch_chunks:
-        #     base.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
-        # for c in ele_chunks:
-        #     base.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
-        for c in match_chunks:
-            base.append({"role":"system","content":f"<NEXT_MATCHES>\n{c}"})
+        for c in sch_chunks:
+            base.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
+        for c in ele_chunks:
+            base.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
 
     # 3) Optionally inject example posts
     if USE_EXAMPLES:
-        pass
-        # for c in example_chunks:
-        #     base.append({"role":"system","content":f"<EXAMPLE_POSTS>\n{c}"})
+        for c in example_chunks:
+            base.append({"role":"system","content":f"<EXAMPLE_POSTS>\n{c}"})
 
     st.session_state.messages   = base
     st.session_state.processing = False
     st.session_state.last_reply = None
 
+    # ─── Automatic first user‐prompt ───────────────────────────────
+    initial_payload = (
+        prompts.prompt_text
+        + "\n\n<NEXT_MATCHES_JSON>\n"
+        + all_matches_json
+        + "\n</NEXT_MATCHES_JSON>"
+    )
+    st.session_state.messages.append({"role": "user", "content": initial_payload})
+
+    # call the model and record its reply
+    with st.spinner("PoloGPT is thinking…"):
+        first_reply = chat_conversation(
+            st.session_state.messages,
+            model="gpt-4.1-mini",
+            token_threshold=TOKEN_THRESHOLD
+        )
+    st.session_state.messages.append({"role": "assistant", "content": first_reply})
+    st.session_state.last_reply = first_reply
+    st.session_state.processing = False
+
 # ─── UI ────────────────────────────────────────────────────────────
-st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Type your message and hit Send to chat with PoloGPT.")
+st.title("🏇 PoloGPT Chatbot")
+st.write("Type your message ...")
 
 # bind the textarea to session_state so it persists
 user_input = st.text_area(
