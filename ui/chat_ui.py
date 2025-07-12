@@ -15,7 +15,3 @@ def chat_interface(history, token_threshold):
             reply = ask_model(history, user_input.strip(), token_threshold=token_threshold)
         st.session_state.last_reply = reply
         st.session_state.processing = False
-
-    if st.session_state.get("last_reply"):
-        st.markdown("**PoloGPT:**")
-        st.write(st.session_state.last_reply)
