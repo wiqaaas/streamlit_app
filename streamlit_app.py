@@ -1,4 +1,3 @@
-# app.py
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -47,50 +46,57 @@ example_chunks   = chunk_json(example_posts_json)
 
 # ─── Session‐state initialization ─────────────────────────────────
 if "messages" not in st.session_state:
-    # 1) Base system prompts
     base = [
         {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist. You know how to craft posts in JSON with keys Platform, Topic, Content."},
         {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
     ]
-
-    # 2) Optionally inject schedule/e‐learning
     if USE_CONTEXT:
         for c in sch_chunks:
             base.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
         for c in ele_chunks:
             base.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
-
-    # 3) Optionally inject example posts
     if USE_EXAMPLES:
         for c in example_chunks:
             base.append({"role":"system","content":f"<EXAMPLE_POSTS>\n{c}"})
-
-    st.session_state.messages = base
+    st.session_state.messages   = base
+    st.session_state.processing = False
 
 # ─── Helper to send & record ───────────────────────────────────────
 def send_message(prompt: str) -> str:
     history = st.session_state.messages
-    # call model
-    reply = chat_conversation(
+    return chat_conversation(
         history + [{"role":"user","content":prompt}],
         model="gpt-4.1-mini",
         token_threshold=TOKEN_THRESHOLD
     )
-    # record turn
-    history.append({"role":"user","content":prompt})
-    history.append({"role":"assistant","content":reply})
-    return reply
 
 # ─── Build the UI ─────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
 st.write("Type your message and hit Send. Each send updates the conversation.")
 
-# persistent input box
-message = st.text_area("Your message", height=150, key="input")
+# ── Use a form that clears on submit ─────────────────────────────
+with st.form("chat_form", clear_on_submit=True):
+    user_input = st.text_area("Your message", height=150, key="input")
+    submit = st.form_submit_button(
+        "🚀 Send",
+        disabled=st.session_state.processing
+    )
 
-if st.button("🚀 Send") and message.strip():
-    reply = send_message(message.strip())
-    # clear the input if you like:
-    st.session_state.input = ""
+if submit and user_input.strip():
+    # mark processing, disable button on rerun
+    st.session_state.processing = True
+
+    # show spinner while waiting
+    with st.spinner("PoloGPT is thinking…"):
+        reply = send_message(user_input.strip())
+
+    # record the turn
+    st.session_state.messages.append({"role":"user","content":user_input})
+    st.session_state.messages.append({"role":"assistant","content":reply})
+
+    # done processing
+    st.session_state.processing = False
+
+    # display reply
     st.markdown("**PoloGPT:**")
     st.write(reply)
