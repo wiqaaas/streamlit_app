@@ -76,7 +76,7 @@ if "messages" not in st.session_state:
     st.session_state.last_reply = None
 
     # ─── Automatic first user‐prompt ───────────────────────────────
-   all_matches_json = "\n".join(match_chunks) 
+    all_matches_json = "\n".join(match_chunks) 
     initial_payload = (
         prompts.prompt_text
         + "\n\n<NEXT_MATCHES_JSON>\n"
