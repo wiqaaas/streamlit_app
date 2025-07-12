@@ -1,0 +1,6 @@
+streamlit
+openai
+gspread
+gspread-dataframe
+pandas
+python-dotenv
