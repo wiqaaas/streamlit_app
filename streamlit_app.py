@@ -68,6 +68,7 @@ if "messages" not in st.session_state:
 
     # 3) Optionally inject example posts
     if USE_EXAMPLES:
+        pass
         # for c in example_chunks:
         #     base.append({"role":"system","content":f"<EXAMPLE_POSTS>\n{c}"})
 
