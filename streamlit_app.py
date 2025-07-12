@@ -15,12 +15,13 @@ load_dotenv(BASE / ".env")
 
 ELEARNING_SOURCE = os.getenv("ELEARNING_SOURCE")
 SCHEDULE_SOURCE  = os.getenv("SCHEDULE_SOURCE")
+MATCHES_SOURCE   = os.getenv("MATCHES_SOURCE")
 USE_CONTEXT      = True
 USE_EXAMPLES     = True 
 TOKEN_THRESHOLD  = 900_000  # 900k tokens for gpt-4.1-mini
 
-if not ELEARNING_SOURCE or not SCHEDULE_SOURCE:
-    st.error("❌ Please set ELEARNING_SOURCE and SCHEDULE_SOURCE in .env")
+if not ELEARNING_SOURCE or not SCHEDULE_SOURCE or not MATCHES_SOURCE:
+    st.error("❌ Please set ELEARNING_SOURCE, SCHEDULE_SOURCE, and MATCHES_SOURCE in .env")
     st.stop()
 
 # ─── Button styling ────────────────────────────────────────────────
@@ -40,63 +41,73 @@ button[data-baseweb="button"]:hover {
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Load & chunk sheets ──────────────────────────────────────────
-ele_chunks, sch_chunks = load_data(ELEARNING_SOURCE, SCHEDULE_SOURCE)
-example_chunks   = chunk_json(example_posts_json)
+# ─── Load & chunk sheets & matches ─────────────────────────────────
+ele_chunks, sch_chunks, match_chunks = load_data(
+    ELEARNING_SOURCE,
+    SCHEDULE_SOURCE,
+    MATCHES_SOURCE
+)
+example_chunks = chunk_json(example_posts_json)
 
-# ─── Session‐state initialization ─────────────────────────────────
+# ─── Session‐state init ───────────────────────────────────────────
 if "messages" not in st.session_state:
+    # 1) Base system prompts
     base = [
         {"role":"system","content":"You are PoloGPT, an expert polo‐social‐media strategist. You know how to craft posts in JSON with keys Platform, Topic, Content."},
         {"role":"system","content":f"Today is {date.today():%B %d, %Y}."}
     ]
+
+    # 2) Optionally inject schedule, e-learning, and upcoming matches
     if USE_CONTEXT:
-        for c in sch_chunks:
-            base.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
-        for c in ele_chunks:
-            base.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
+        # for c in sch_chunks:
+        #     base.append({"role":"system","content":f"<SCHEDULE_DATA>\n{c}"})
+        # for c in ele_chunks:
+        #     base.append({"role":"system","content":f"<ELEARNING_DATA>\n{c}"})
+        for c in match_chunks:
+            base.append({"role":"system","content":f"<NEXT_MATCHES>\n{c}"})
+
+    # 3) Optionally inject example posts
     if USE_EXAMPLES:
-        for c in example_chunks:
-            base.append({"role":"system","content":f"<EXAMPLE_POSTS>\n{c}"})
+        # for c in example_chunks:
+        #     base.append({"role":"system","content":f"<EXAMPLE_POSTS>\n{c}"})
+
     st.session_state.messages   = base
     st.session_state.processing = False
+    st.session_state.last_reply = None
 
-# ─── Helper to send & record ───────────────────────────────────────
-def send_message(prompt: str) -> str:
-    history = st.session_state.messages
-    return chat_conversation(
-        history + [{"role":"user","content":prompt}],
-        model="gpt-4.1-mini",
-        token_threshold=TOKEN_THRESHOLD
-    )
-
-# ─── Build the UI ─────────────────────────────────────────────────
+# ─── UI ────────────────────────────────────────────────────────────
 st.title("🏇 PoloGPT Chatbot (gpt-4.1-mini)")
-st.write("Type your message and hit Send. Each send updates the conversation.")
+st.write("Type your message and hit Send to chat with PoloGPT.")
 
-# ── Use a form that clears on submit ─────────────────────────────
-with st.form("chat_form", clear_on_submit=True):
-    user_input = st.text_area("Your message", height=150, key="input")
-    submit = st.form_submit_button(
-        "🚀 Send",
-        disabled=st.session_state.processing
-    )
+# bind the textarea to session_state so it persists
+user_input = st.text_area(
+    "Your message", 
+    height=150, 
+    key="input"
+)
 
-if submit and user_input.strip():
-    # mark processing, disable button on rerun
+# disable while processing
+send = st.button(
+    "🚀 Send", 
+    disabled=st.session_state.processing
+)
+
+# ─── On Send ───────────────────────────────────────────────────────
+if send and user_input.strip():
     st.session_state.processing = True
-
-    # show spinner while waiting
     with st.spinner("PoloGPT is thinking…"):
-        reply = send_message(user_input.strip())
-
-    # record the turn
+        reply = chat_conversation(
+            st.session_state.messages + [{"role":"user","content":user_input}],
+            model="gpt-4.1-mini",
+            token_threshold=TOKEN_THRESHOLD
+        )
+    # record
     st.session_state.messages.append({"role":"user","content":user_input})
     st.session_state.messages.append({"role":"assistant","content":reply})
-
-    # done processing
+    st.session_state.last_reply = reply
     st.session_state.processing = False
 
-    # display reply
+# ─── Always show last reply ────────────────────────────────────────
+if st.session_state.last_reply:
     st.markdown("**PoloGPT:**")
-    st.write(reply)
+    st.write(st.session_state.last_reply)
